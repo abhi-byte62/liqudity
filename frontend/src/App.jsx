@@ -26,13 +26,15 @@ export default function App() {
   const [simResult, setSimResult] = useState(null);
   const [latencyData, setLatencyData] = useState(null);
   const [isRunningSim, setIsRunningSim] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Fetch available markets
   useEffect(() => {
-    const fetchMarkets = async () => {
+    let ignore = false;
+    async function fetchMarkets() {
       try {
         const res = await fetch(`${API_BASE}/api/markets`);
-        if (res.ok) {
+        if (!ignore && res.ok) {
           const data = await res.json();
           if (data.markets && data.markets.length > 0) {
             setMarkets(data.markets);
@@ -41,39 +43,45 @@ export default function App() {
       } catch (err) {
         console.warn('Markets fetch error:', err);
       }
-    };
+    }
     fetchMarkets();
+    return () => {
+      ignore = true;
+    };
   }, []);
 
-  // Fetch snapshot and latency sweep
-  const loadSnapshot = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/orderbook/snapshot?dataset=${selectedMarket}`);
-      if (res.ok) {
-        const data = await res.json();
-        setSnapshot(data);
-      }
-    } catch (err) {
-      console.warn('Backend snapshot fetch error:', err);
-    }
-  };
-
-  const loadLatencySweep = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/experiments/latency?dataset=${selectedMarket}`);
-      if (res.ok) {
-        const data = await res.json();
-        setLatencyData(data);
-      }
-    } catch (err) {
-      console.warn('Latency sweep fetch error:', err);
-    }
-  };
-
+  // Fetch snapshot and latency sweep on market change or refresh trigger
   useEffect(() => {
-    loadSnapshot();
-    loadLatencySweep();
-  }, [selectedMarket]);
+    let ignore = false;
+    async function loadMarketData() {
+      try {
+        const [snapRes, latRes] = await Promise.all([
+          fetch(`${API_BASE}/api/orderbook/snapshot?dataset=${selectedMarket}`),
+          fetch(`${API_BASE}/api/experiments/latency?dataset=${selectedMarket}`)
+        ]);
+        if (!ignore) {
+          if (snapRes.ok) {
+            const data = await snapRes.json();
+            setSnapshot(data);
+          }
+          if (latRes.ok) {
+            const data = await latRes.json();
+            setLatencyData(data);
+          }
+        }
+      } catch (err) {
+        console.warn('Backend data fetch error:', err);
+      }
+    }
+    loadMarketData();
+    return () => {
+      ignore = true;
+    };
+  }, [selectedMarket, refreshTrigger]);
+
+  const handleRefresh = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   // Run backtest simulation
   const handleRunBacktest = async (params) => {
@@ -105,7 +113,7 @@ export default function App() {
         markets={markets}
         selectedMarket={selectedMarket}
         onSelectMarket={setSelectedMarket}
-        onRefresh={loadSnapshot}
+        onRefresh={handleRefresh}
       />
 
       {/* Main Navigation Toolbar */}
@@ -117,7 +125,7 @@ export default function App() {
       {/* Main Content Workspace */}
       <main className="main-content">
         {activeTab === 'orderbook' && (
-          <OrderBookView snapshot={snapshot} onRefresh={loadSnapshot} />
+          <OrderBookView snapshot={snapshot} />
         )}
 
         {activeTab === 'queue' && (
