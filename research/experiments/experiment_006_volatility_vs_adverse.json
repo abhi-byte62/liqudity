@@ -1,0 +1,28 @@
+{
+  "experiment_id": "EXP-006",
+  "title": "Volatility vs Adverse Selection",
+  "hypothesis": "Higher volatility increases the magnitude and frequency of adverse selection markout losses.",
+  "results": [
+    {
+      "regime": "Low Volatility (12 bps)",
+      "volatility_bps": 12.5,
+      "adverse_selection_bps": 0.0412823,
+      "fill_rate_percent": 99.1914,
+      "net_pnl_bps": -0.892766
+    },
+    {
+      "regime": "Medium Volatility (22 bps)",
+      "volatility_bps": 22.0,
+      "adverse_selection_bps": 0.195811,
+      "fill_rate_percent": 108.434,
+      "net_pnl_bps": -1.9593
+    },
+    {
+      "regime": "High Volatility (48 bps)",
+      "volatility_bps": 48.2,
+      "adverse_selection_bps": 0.197842,
+      "fill_rate_percent": 105.189,
+      "net_pnl_bps": -24.226
+    }
+  ]
+}
