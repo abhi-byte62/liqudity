@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  liquidity-lens:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: liquidity_lens_app
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data/processed:/app/data/processed
+      - ./research/experiments:/app/research/experiments
+    restart: unless-stopped
