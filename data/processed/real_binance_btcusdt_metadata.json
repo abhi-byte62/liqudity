@@ -1,0 +1,11 @@
+{
+  "dataset_type": "real",
+  "source": "Binance Public Market Data Feed",
+  "symbol": "BTCUSDT",
+  "data_type": "Real Executed Trades & L2 Depth Seed",
+  "timestamp_resolution": "1 millisecond (converted to ns)",
+  "total_events": 1100,
+  "tick_size": 0.01,
+  "start_time_utc": "2026-09-29T17:50:58Z",
+  "limitations": "Binance public spot API provides L2 aggregated depth rather than individual anonymous L3 order IDs. Orders ahead are reconstructed from top-of-book volume queue."
+}
