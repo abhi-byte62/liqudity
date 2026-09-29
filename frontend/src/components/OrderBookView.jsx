@@ -1,7 +1,18 @@
 import React from 'react';
 import { Activity, Layers } from 'lucide-react';
 
-export default function OrderBookView({ snapshot, onRefresh }) {
+function computeDepthCumulative(items, maxCount = 12) {
+  const result = [];
+  let cum = 0;
+  const slice = items.slice(0, maxCount);
+  for (let i = 0; i < slice.length; i++) {
+    cum += slice[i].quantity;
+    result.push({ ...slice[i], cum });
+  }
+  return result;
+}
+
+export default function OrderBookView({ snapshot }) {
   if (!snapshot) {
     return (
       <div className="terminal-panel" style={{ padding: '32px', textAlign: 'center' }}>
@@ -27,18 +38,8 @@ export default function OrderBookView({ snapshot, onRefresh }) {
   const maxAskQty = Math.max(...asks.map(a => a.quantity), 1);
   const maxDepthQty = Math.max(maxBidQty, maxAskQty, 1);
 
-  // Cumulative depths
-  let cumBid = 0;
-  const bidsWithCum = bids.slice(0, 12).map(b => {
-    cumBid += b.quantity;
-    return { ...b, cum: cumBid };
-  });
-
-  let cumAsk = 0;
-  const asksWithCum = asks.slice(0, 12).map(a => {
-    cumAsk += a.quantity;
-    return { ...a, cum: cumAsk };
-  });
+  const bidsWithCum = computeDepthCumulative(bids, 12);
+  const asksWithCum = computeDepthCumulative(asks, 12);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
