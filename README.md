@@ -1,208 +1,212 @@
-# 🌊 LiquidityLens
+# LiquidityLens
 
-**Event-Driven Limit Order Book Dynamics, Exact Queue Modeling, Latency Sensitivity & Adverse Selection Research Engine**
+**Event-driven market microstructure research and execution simulator.**
 
-![C++](https://img.shields.io/badge/Core%20Engine-C%2B%2B14%2F17%20Fixed--Point-00599C?style=for-the-badge&logo=cplusplus)
-![Python](https://img.shields.io/badge/Research-Python%20%7C%20FastAPI%20%7C%20SciPy-3776AB?style=for-the-badge&logo=python)
-![React](https://img.shields.io/badge/Dashboard-React%20%7C%20Vite%20%7C%20Lucide-61DAFB?style=for-the-badge&logo=react)
-![Throughput](https://img.shields.io/badge/LOB%20Throughput-4.56M%20Events%2Fsec-10B981?style=for-the-badge)
-![Latency](https://img.shields.io/badge/Avg%20Latency-219.5ns%20(%3C0.22μs)-00F0FF?style=for-the-badge)
+LiquidityLens is a quantitative research platform and C++ simulation engine designed to analyze limit-order-book dynamics, liquidity provision, queue priority, execution probability, and adverse selection.
 
----
+Instead of attempting naive directional price forecasting, LiquidityLens models the structural market-making problem:
 
-## 1. Problem & Motivation
+> *When a liquidity provider posts a passive limit order, what is the probability that the order executes immediately before the market moves against the trader?*
 
-Traditional beginner trading systems focus on naive directional price predictions:
-$$\text{Historical Prices} \longrightarrow \text{Machine Learning Prediction} \longrightarrow \text{Buy/Sell}$$
-
-**LiquidityLens** investigates the fundamental market microstructure problem in high-frequency trading and market making:
-
-> *When a liquidity provider posts a passive limit order, what is the probability that the order gets executed immediately before the market moves against the trader?*
-
-```
-Market Events (L2 / Real Trades / L3)
-                   │
-                   ▼
-Limit Order Book (Fixed-Point int64_t Core)
-                   │
-                   ▼
-Exact FIFO Queue Ahead Tracking (Order-Level Attribution)
-                   │
-                   ▼
-Execution Allocation & 4-Stage Latency Pipeline (10μs - 500μs)
-                   │
-                   ▼
-Post-Fill Price Movement (Markouts 1ms - 1s, Zero Look-Ahead)
-                   │
-                   ▼
-Adverse Selection Probability & Expected Economics E[PnL]
-```
-
-LiquidityLens reconstructs deterministic order book states from granular market event streams (`ADD`, `CANCEL`, `MODIFY`, `TRADE`, `SNAPSHOT`), tracks individual FIFO order queues with exact order-level cancellation attribution, simulates 4-stage microsecond latency pipelines ($10\mu s \to 500\mu s$), and measures the economic trade-off between **Spread Capture** and **Adverse Selection**.
-
-> **Research Disclaimer:** *LiquidityLens is a quantitative research and execution-simulation platform designed for microstructure analysis and performance modeling, not a production execution gateway.*
+The system reconstructs deterministic order-book states from market event feeds, models FIFO queue positioning with order-level cancellation attribution, simulates multi-stage microsecond latency budgets ($10\,\mu\text{s} \to 500\,\mu\text{s}$), and computes multi-horizon post-fill markouts with zero look-ahead bias.
 
 ---
 
-## 2. Quantitative Architecture & Core Upgrades
+## 1. System Architecture
 
-### A. Fixed-Point Price Representation
-To guarantee deterministic price comparisons and eliminate floating-point equality non-determinism, the engine uses fixed-point integer ticks:
+```text
+                    MARKET DATA
+                  /             \
+             REAL L2          SYNTHETIC L3
+          (Binance Spot)    (Hawkes Process)
+                \               /
+                 +------+------+
+                        |
+                  EVENT REPLAY
+             (Deterministic Stream)
+                        |
+                LIMIT ORDER BOOK
+             (Fixed-Point int64_t)
+                        |
+          +-------------+-------------+
+          |             |             |
+     QUEUE MODEL   MICROSTRUCTURE   LATENCY MODEL
+     (Exact FIFO     FEATURES      (4-Stage Delay
+     Attribution)  (OBI, Micro-P)   10μs - 500μs)
+          |             |             |
+          +-------------+-------------+
+                        |
+               EXECUTION SIMULATOR
+             (Passive Fill Allocation)
+                        |
+                 STRATEGY ENGINE
+             (Avellaneda-Stoikov / Hawkes)
+                        |
+                    BACKTEST
+             (1s Resampled Return Series)
+                        |
+             +----------+----------+
+             |                     |
+       P&L ACCOUNTING        RESEARCH LAB
+     (Cash + Inv * Mid)     (EXP-001..007)
+             |                     |
+             +----------+----------+
+                        |
+                   FASTAPI API
+                        |
+              REACT QUANT TERMINAL
+```
+
+---
+
+## 2. Core Capabilities & Methodology
+
+### A. Fixed-Point Integer Price Engine
+All prices are represented as discrete fixed-point integer ticks:
 ```cpp
-using Price = int64_t; // Discrete integer ticks
+using Price = int64_t;
 ```
-Conversion helpers:
-* `Price price_ticks = double_to_ticks(price_decimal, tick_size);`
-* `double price_decimal = ticks_to_double(price_ticks, tick_size);`
+Floating-point comparisons are eliminated from order matching and book state maintenance. Conversion helpers translate between floating-point input decimals and internal integer ticks deterministically based on instrument `tick_size`.
 
-### B. Exact Queue Cancellation Attribution
-When placing a simulated order at a price level:
-1. The engine records the exact set of market `OrderId`s sitting ahead in the FIFO queue (`orders_ahead`).
-2. When a market cancellation arrives:
-   * If `order_id` $\in$ `orders_ahead`: `current_queue_ahead` is decremented by the cancelled quantity.
-   * If `order_id` $\notin$ `orders_ahead`: the cancellation was behind us (or at another level); `current_queue_ahead` **remains unaffected**.
+### B. Exact FIFO Queue Tracking & Cancellation Attribution
+When placing a hypothetical passive limit order at price level $P$:
+1. The engine indexes the exact set of resting market `OrderId`s sitting ahead in the FIFO queue (`orders_ahead`).
+2. Incoming cancellations are evaluated individually:
+   - If $\text{order\_id} \in \text{orders\_ahead}$, queue ahead volume is decremented by $\min(Q_{\text{ahead}}, Q_{\text{cancelled}})$.
+   - If $\text{order\_id} \notin \text{orders\_ahead}$, the cancellation occurred behind the simulated order (or at another price level); queue ahead volume is preserved.
+3. Aggressive market trades deplete volume ahead first before allocating partial or full fills to the simulated order.
 
-### C. Adverse Selection Markouts (Zero Look-Ahead Bias)
-For Maker BUY fill at $t_0$:
-$$\text{Markout}(\tau) = \frac{Mid(t_0 + \tau) - Mid(t_0)}{Mid(t_0)} \times 10000 \quad (\text{bps})$$
+### C. Zero Look-Ahead Multi-Horizon Markouts
+Post-fill price movement is evaluated across 7 discrete observation horizons ($\tau \in \{1\text{ms}, 5\text{ms}, 10\text{ms}, 50\text{ms}, 100\text{ms}, 500\text{ms}, 1\text{s}\}$):
+$$\text{Markout}_{\text{BUY}}(\tau) = \frac{\text{Mid}(t_{\text{fill}} + \tau) - \text{Mid}(t_{\text{fill}})}{\text{Mid}(t_{\text{fill}})} \times 10^4 \quad (\text{bps})$$
+$$\text{Markout}_{\text{SELL}}(\tau) = \frac{\text{Mid}(t_{\text{fill}}) - \text{Mid}(t_{\text{fill}} + \tau)}{\text{Mid}(t_{\text{fill}})} \times 10^4 \quad (\text{bps})$$
+Quoting strategies strictly receive market state information at or before decision timestamp $t \le t_{\text{decision}}$. Future observation windows $\tau$ are computed post-hoc for statistical markout curves without influencing quoting decisions.
 
-For Maker SELL fill at $t_0$:
-$$\text{Markout}(\tau) = \frac{Mid(t_0) - Mid(t_0 + \tau)}{Mid(t_0)} \times 10000 \quad (\text{bps})$$
-
-Positive values strictly represent favorable movement for the liquidity provider. Evaluated across 7 horizons: **1ms, 5ms, 10ms, 50ms, 100ms, 500ms, 1000ms**. Strategy quoting decisions strictly use data at time $t \le t_{\text{decision}}$, guaranteeing zero look-ahead bias.
-
-### D. Expected Economics Decomposition
-$$E[\text{PnL}] = E[\text{Spread Capture}] - E[\text{Adverse Selection}] - \text{Fees} - \text{Slippage} - \text{Inventory Cost}$$
-
-### E. Resampled Sharpe Ratio
-Sharpe and Sortino ratios are computed on **1-second fixed-time interval resampled returns** rather than irregular event counts, ensuring a statistically sound annualization factor:
-$$\text{Annual Factor} = \sqrt{252 \times 6.5 \times 3600} \approx 2428.33$$
+### D. Statistically Sound Backtest & Invariant Accounting
+- **1-Second Resampled Sharpe:** Return volatility and Sharpe ratios are computed from fixed-interval 1-second resampled mark-to-market equity snapshots rather than irregular event intervals.
+- **Invariant Conservation:** Total equity at any timestamp satisfies $\text{Equity}(t) = \text{Cash}(t) + \text{Inventory}(t) \times \text{MidPrice}(t)$.
 
 ---
 
-## 3. Real vs. Synthetic Market Data
+## 3. Data Provenance
 
-LiquidityLens maintains a clear, explicit separation between Real and Synthetic datasets:
+LiquidityLens maintains a strict distinction between real and synthetic feeds:
 
-| Dataset ID | Type | Source | Description | Events |
+| Dataset Identifier | Classification | Source | Description | Record Count |
 | :--- | :--- | :--- | :--- | :--- |
-| `real_binance_btcusdt` | **REAL** | Binance Public Market Feed | Real executed trades and top L2 depth reconstruction | 1,100 |
-| `btc_liquid_balanced` | **SYNTHETIC** | Hawkes Process Generator | 1-tick tight spread, symmetric arrival flow | 30,028 |
-| `btc_high_volatility` | **SYNTHETIC** | Hawkes Process Generator | Volatility clustering, wide spreads, aggressive sweeps | 24,837 |
-| `btc_trending_momentum`| **SYNTHETIC** | Hawkes Process Generator | Persistent positive OBI (+0.45) with strong buyer drift | 30,028 |
-| `btc_liquidity_drought` | **SYNTHETIC** | Hawkes Process Generator | 6-tick wide spread, thin depth, severe adverse selection | 25,731 |
+| `real_binance_btcusdt` | **REAL** | Binance Public REST/Depth API | Real executed trades + Top 100 L2 depth seed | 1,100 events |
+| `btc_liquid_balanced` | **SYNTHETIC** | Multivariate Hawkes Point Process | 1-tick tight spread, symmetric arrival flow | 30,028 events |
+| `btc_high_volatility` | **SYNTHETIC** | Multivariate Hawkes Point Process | Volatility clustering, wide spreads, aggressive sweeps | 24,837 events |
+| `btc_trending_momentum`| **SYNTHETIC** | Multivariate Hawkes Point Process | Asymmetric intensity, positive OBI (+0.45) drift | 30,028 events |
+| `btc_liquidity_drought` | **SYNTHETIC** | Multivariate Hawkes Point Process | Sparse order flow, wide spreads (>6 ticks) | 25,731 events |
+
+> **Data Limitation Note:** Binance public spot feeds provide aggregated Level-2 depth snapshots and executed trades. Binance does not publish individual anonymous order lifecycle IDs (`ADD`, `MODIFY`, `CANCEL`). True per-order cancellation attribution is evaluated on synthetic L3 streams. See [DATA_PROVENANCE.md](DATA_PROVENANCE.md) for full specifications.
 
 ---
 
-## 4. C++ Core Benchmarks (Before vs. After)
+## 4. Quantitative Research Experiments
 
-Tested on $150,000$ high-frequency event feeds on Windows MinGW GCC (C++14 `-O3`):
+All 7 research experiments are executed via `python research/experiments.py`:
 
-| Metric | Floating-Point Baseline | Fixed-Point `int64_t` Core | Improvement |
+* **EXP-001 (OBI vs. Short-Horizon Mid-Price Movement):** Evaluates whether order-book imbalance ($\text{OBI} = \frac{Q_b - Q_a}{Q_b + Q_a}$) contains measurable predictive information about future mid-price changes over horizons from $10\,\text{ms}$ to $1\,\text{s}$.
+* **EXP-002 (Queue Position vs. Fill Probability):** Measures empirical fill probability and time-to-fill as a function of normalized initial queue depth ($Q_{\text{ahead}} / Q_{\text{level}}$).
+* **EXP-003 & EXP-004 (Latency vs. Fill Rate & Adverse Selection):** Evaluates how order transmission delays ($10\,\mu\text{s} \to 500\,\mu\text{s}$) degrade passive fill rates and increase adverse selection markouts.
+* **EXP-005 (Spread vs. Expected P&L):** Analyzes the trade-off between quoting wider spreads (lower fill probability, higher edge per trade) versus narrower spreads (higher fill probability, higher adverse selection).
+* **EXP-006 (Volatility vs. Adverse Selection):** Measures how local microstructure volatility scales the magnitude of post-fill adverse price movement.
+* **EXP-007 (Synthetic vs. Real Market Data Comparison):** Cross-validates synthetic Hawkes microstructure distributions against real Binance trade flow.
+
+---
+
+## 5. C++ Core Benchmarks
+
+Micro-benchmarked on $150,000$ market events under a local testing environment (Windows x86_64, MinGW GCC C++17 `-O3`):
+
+| Component / Metric | Floating-Point Baseline | Fixed-Point `int64_t` Core | Delta |
 | :--- | :--- | :--- | :--- |
-| **LOB Throughput** | 2.42 Million events/sec | **4.56 Million events/sec** | **+88.4% Faster** |
-| **Average Latency** | 413.1 ns ($0.41\ \mu\text{s}$) | **219.5 ns ($0.22\ \mu\text{s}$)** | **-46.9% Latency Reduction** |
-| **Tail Latency ($p_{90}$)** | 1,994 ns ($1.99\ \mu\text{s}$) | **1,114 ns ($1.11\ \mu\text{s}$)** | **-44.1%** |
-| **Tail Latency ($p_{99}$)** | 3,046 ns ($3.05\ \mu\text{s}$) | **2,168 ns ($2.17\ \mu\text{s}$)** | **-28.8%** |
-| **Invariant Integrity** | Partial | **100% Passed** | **Verified** |
+| **LOB Processing Throughput** | 2.42 Million events/sec | **4.51–5.08 Million events/sec** | **+86.4% to +110%** |
+| **Average Event Latency** | 413.1 ns ($0.41\,\mu\text{s}$) | **196.7–221.7 ns ($<0.23\,\mu\text{s}$)** | **-46.3% to -52.4%** |
+| **Tail Latency ($p_{90}$)** | 1,994 ns ($1.99\,\mu\text{s}$) | **1,098–1,108 ns ($1.10\,\mu\text{s}$)** | **-44.4%** |
+| **Tail Latency ($p_{99}$)** | 3,046 ns ($3.05\,\mu\text{s}$) | **2,034–2,040 ns ($2.04\,\mu\text{s}$)** | **-33.0%** |
+| **Book Invariants** | Unchecked | **100% Verified (Strictly Uncrossed)** | **Guaranteed** |
+
+*Note: Benchmark results represent single-threaded C++ event processing throughput under the specified local test hardware and do not represent a production multi-cast network gateway.*
 
 ---
 
-## 5. Quantitative Research Experiments
+## 6. Reproduction & Build Instructions
 
-All 7 research experiments are reproducible via `python research/experiments.py`:
-
-* **EXP-001:** Order Book Imbalance vs. Future Mid-Price Movement
-* **EXP-002:** Queue Position vs. Fill Probability
-* **EXP-003 & EXP-004:** Latency Sensitivity vs. Fill Probability & Adverse Selection
-* **EXP-005:** Spread vs. Expected P&L Tradeoff
-* **EXP-006:** Volatility vs. Adverse Selection Magnitude
-* **EXP-007:** Synthetic Hawkes Model vs. Real Binance Exchange Market Data
-
----
-
-## 6. How to Build, Test & Run
-
-### 1. Build and Run C++ Engine & Tests
+### Quick Automated Reproduction (1-Command)
 ```bash
-# Compile and run comprehensive unit & property tests
-g++ -std=c++14 -O3 -Wall -Wextra -Wpedantic tests/test_engine.cpp -o test_engine.exe
-.\test_engine.exe
+# Windows
+reproduce.bat
 
-# Run performance micro-benchmarks
-g++ -std=c++14 -O3 -Wall -Wextra -Wpedantic engine/benchmarks/benchmarks.cpp -o engine_benchmarks.exe
-.\engine_benchmarks.exe 150000
-
-# Run Main C++ Simulator CLI
-g++ -std=c++14 -O3 -Wall -Wextra -Wpedantic engine/main.cpp -o liquidity_lens_engine.exe
-.\liquidity_lens_engine.exe --input data/processed/real_binance_btcusdt.csv --strategy avellaneda --latency 25us --tick-size 0.01 --output-json results.json
+# Linux / macOS
+chmod +x reproduce.sh && ./reproduce.sh
 ```
 
-### 2. Run Data Pipelines & Research Experiments
+### Manual Step-by-Step Execution
+
+#### 1. Compile and Run C++ Test Suite (10 Comprehensive Suites)
 ```bash
-# Ingest real Binance market data
+g++ -std=c++17 -O3 -Wall -Wextra -I. tests/test_engine.cpp -o test_engine.exe
+.\test_engine.exe
+```
+
+#### 2. Run C++ Performance Benchmark Suite
+```bash
+g++ -std=c++17 -O3 -Wall -Wextra -I. engine/benchmarks/benchmarks.cpp -o engine_benchmarks.exe
+.\engine_benchmarks.exe 150000
+```
+
+#### 3. Ingest Market Data & Run Research Experiments
+```bash
+# Ingest real Binance trades and depth
 python data/real_data_adapter.py
 
-# Run all 7 reproducible research experiments
+# Run all 7 quantitative experiments
 python research/experiments.py
 ```
 
-### 3. Launch Research Backend & Frontend
+#### 4. Launch Backend API & Interactive Terminal
 ```bash
-# Start FastAPI backend
+# Start FastAPI backend (Port 8000)
 python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
 
-# Start React Frontend
+# Start React Research Terminal (Port 5174)
 cd frontend
 npm install
 npm run dev
 ```
-Open your browser at `http://localhost:5174/` to explore the interactive dashboard.
+Open browser at `http://localhost:5174/`.
 
-### 4. Docker Deployment
+#### 5. Docker Deployment
 ```bash
 docker-compose up --build
 ```
 
 ---
 
-## 7. Project Structure
+## 7. Technology Stack
 
-```
-quanty/
-├── engine/                       # High-Performance C++ Core
-│   ├── core/types.hpp            # Fixed-point Price = int64_t, conversion helpers
-│   ├── orderbook/                # Price level queues & Limit Order Book
-│   ├── queue/queue_tracker.hpp   # Exact order-level queue attribution
-│   ├── features/                 # OBI, Micro-price, Hawkes & Volatility engine
-│   ├── adverse_selection/        # Zero look-ahead markout evaluator (1ms to 1s)
-│   ├── latency/latency_model.hpp # 4-stage pipeline latency & jitter model
-│   ├── strategies/               # Avellaneda-Stoikov & Hawkes MM strategies
-│   ├── execution/                # Resampled Sharpe & economic PnL accounting
-│   ├── simulator/                # High-speed CSV/binary event replayer
-│   ├── benchmarks/               # C++ benchmark suite
-│   └── main.cpp                  # C++ CLI executable
-│
-├── data/                         # Market Data Pipelines
-│   ├── real_data_adapter.py      # Real Binance historical trade & depth ingest
-│   ├── generator.py              # Hawkes L3 synthetic generator & 4 regimes
-│   └── processed/                # Normalized real & synthetic feeds
-│
-├── research/                     # Quantitative Research
-│   ├── analytics.py              # Hawkes MLE fitting, Markout curves, AS curves
-│   └── experiments.py            # 7 reproducible research experiments
-│
-├── backend/                      # FastAPI & WebSocket Backend
-│   └── app.py                    # REST APIs & /ws/replay live streamer
-│
-├── frontend/                     # React + Vite Research Dashboard
-│   ├── src/components/           # Order Book, Queue, Markouts, Latency Matrix, Backtest Lab
-│   └── src/index.css             # Glassmorphic quant trading design system
-│
-├── tests/                        # Comprehensive Unit & Property Tests
-│   └── test_engine.cpp           # 8 core C++ unit & property tests
-│
-├── Dockerfile                    # Multi-stage production container build
-├── docker-compose.yml            # Docker orchestration
-└── requirements.txt              # Python dependencies
-```
+- **Core Engine:** C++17 (`<cstdint>`, `<unordered_map>`, `<map>`, `<chrono>`, zero external C++ dependencies).
+- **Research Layer:** Python 3.10+, NumPy, Pandas, SciPy (Hawkes MLE, markout analytics, resampled returns).
+- **Backend API:** FastAPI, Uvicorn, WebSocket streaming.
+- **Research Dashboard:** React 19, Vite, Lucide-React, custom SVG time-series & queue depth rendering.
+- **Containerization:** Docker multi-stage build, Docker Compose.
+
+---
+
+## 8. Portfolio Summary
+
+> **LiquidityLens — Market Microstructure Research Engine**
+> Event-driven C++ market microstructure simulator for studying limit-order-book dynamics, queue position, adverse selection, latency sensitivity, and market-making execution.
+> - Implemented fixed-point `int64_t` price representations and deterministic FIFO queue tracking with order-level cancellation attribution.
+> - Built latency-aware execution simulation ($10\,\mu\text{s} \to 500\,\mu\text{s}$) and market-making strategies (Avellaneda-Stoikov & Hawkes skew) with strict invariant P&L accounting.
+> - Evaluated queue position, order-book imbalance, latency sensitivity, and adverse selection markouts using real Binance L2/trade data and synthetic Hawkes L3 simulations.
+> - Benchmarked C++ engine achieving 4.5M+ events/sec throughput and ~220ns latency under controlled local test conditions.
+
+---
+
+## 9. License
+
+MIT License. See [LICENSE](LICENSE) for details.
