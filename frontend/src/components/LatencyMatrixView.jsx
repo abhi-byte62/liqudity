@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Zap, Clock, TrendingDown, ArrowRight, ShieldCheck, DollarSign } from 'lucide-react';
+import { Zap } from 'lucide-react';
 
 export default function LatencyMatrixView({ latencyData }) {
   const defaultSweep = [
@@ -13,145 +13,132 @@ export default function LatencyMatrixView({ latencyData }) {
 
   const sweep = latencyData?.sweep || defaultSweep;
   const [selectedProfile, setSelectedProfile] = useState('25us');
-
   const activeRow = sweep.find(r => r.latency === selectedProfile) || sweep[1];
 
   return (
-    <div style={{ padding: '0 20px 24px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* Header */}
-      <div className="glass-panel" style={{ padding: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-          <Zap size={20} color="var(--accent-amber)" />
-          <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#f8fafc' }}>
-            Latency Sensitivity & Quant Dev Performance Matrix
-          </h2>
-          <span className="badge badge-amber">Microsecond Execution Architecture</span>
-        </div>
-        <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-          Comparing 4-stage pipeline latency ($10\mu s \to 500\mu s$): Market Data Ingress $\to$ Strategy Decision $\to$ Network Wire $\to$ Exchange Gateway.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {/* Header Panel */}
+      <div className="terminal-panel" style={{ padding: '12px 16px' }}>
+        <span className="panel-title" style={{ fontSize: '13px' }}>
+          <Zap size={14} color="var(--color-amber)" />
+          LATENCY SENSITIVITY & EXECUTION PIPELINE MATRIX
+        </span>
+        <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+          Simulating 4-stage pipeline propagation: Market Data Ingress $\to$ Strategy Decision $\to$ Network Wire $\to$ Exchange Gateway ($10\mu s \to 500\mu s$).
         </p>
       </div>
 
-      {/* Latency Matrix Table */}
-      <div className="glass-panel" style={{ padding: '20px' }}>
-        <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#f8fafc', marginBottom: '14px' }}>
-          Microsecond Latency Comparison Matrix
-        </h3>
-
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', textAlign: 'left', height: '36px' }}>
-                <th style={{ padding: '8px 12px' }}>Profile</th>
-                <th style={{ padding: '8px 12px' }}>Total Latency</th>
-                <th style={{ padding: '8px 12px' }}>Fill Rate (%)</th>
-                <th style={{ padding: '8px 12px' }}>Spread Capture</th>
-                <th style={{ padding: '8px 12px' }}>Adverse Selection</th>
-                <th style={{ padding: '8px 12px' }}>Net P&L (bps)</th>
-                <th style={{ padding: '8px 12px' }}>Sharpe Ratio</th>
-                <th style={{ padding: '8px 12px' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sweep.map((row, idx) => {
-                const isSelected = row.latency === selectedProfile;
-                return (
-                  <tr 
-                    key={idx} 
-                    style={{
-                      borderBottom: '1px solid rgba(255,255,255,0.05)',
-                      height: '46px',
-                      background: isSelected ? 'rgba(0, 240, 255, 0.08)' : 'transparent',
-                      transition: 'background 0.2s'
-                    }}
-                  >
-                    <td style={{ padding: '8px 12px', fontWeight: '700', color: isSelected ? 'var(--accent-cyan)' : 'var(--text-primary)' }}>
-                      {row.latency}
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <span className="mono-num" style={{ color: 'var(--text-secondary)' }}>
-                        {(row.latency_ns / 1000).toFixed(0)} μs
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <span className="mono-num" style={{ fontWeight: '600', color: row.fill_rate_percent > 60 ? 'var(--accent-green)' : 'var(--accent-amber)' }}>
-                        {row.fill_rate_percent}%
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <span className="mono-num" style={{ color: 'var(--accent-green)' }}>
-                        +{row.spread_captured_bps} bps
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <span className="mono-num" style={{ color: 'var(--accent-red)' }}>
-                        -{row.adverse_selection_bps} bps
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <span className="mono-num" style={{ fontWeight: '700', color: row.net_pnl_bps >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-                        {row.net_pnl_bps >= 0 ? `+${row.net_pnl_bps}` : row.net_pnl_bps} bps
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <span className="mono-num" style={{ color: row.sharpe_ratio > 0 ? 'var(--accent-cyan)' : 'var(--accent-red)' }}>
-                        {row.sharpe_ratio}
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <button
-                        onClick={() => setSelectedProfile(row.latency)}
-                        className={`btn-quant ${isSelected ? '' : 'btn-secondary'}`}
-                        style={{ padding: '4px 10px', fontSize: '11px' }}
-                      >
-                        {isSelected ? 'Active' : 'Inspect'}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {/* Latency Comparison Table */}
+      <div className="terminal-panel">
+        <div className="terminal-header">
+          <span className="panel-title">
+            SIMULATED LATENCY PROFILES VS EXECUTION ALPHA
+          </span>
+          <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+            N=150,000 EVENTS
+          </span>
         </div>
+
+        <table className="terminal-table">
+          <thead>
+            <tr>
+              <th>PROFILE</th>
+              <th>LATENCY (NS)</th>
+              <th>FILL RATE (%)</th>
+              <th>SPREAD CAPTURED</th>
+              <th>ADVERSE SELECTION</th>
+              <th>NET P&L</th>
+              <th>SHARPE RATIO</th>
+              <th>STATUS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sweep.map((row, idx) => {
+              const isSelected = row.latency === selectedProfile;
+              return (
+                <tr 
+                  key={idx}
+                  onClick={() => setSelectedProfile(row.latency)}
+                  style={{ 
+                    cursor: 'pointer',
+                    background: isSelected ? 'var(--bg-row-selected)' : 'transparent'
+                  }}
+                >
+                  <td className="font-mono" style={{ fontWeight: '600', color: isSelected ? 'var(--color-blue)' : 'var(--text-primary)' }}>
+                    {row.latency}
+                  </td>
+                  <td className="font-mono" style={{ color: 'var(--text-muted)' }}>
+                    {(row.latency_ns / 1000).toFixed(0)} μs
+                  </td>
+                  <td className="font-mono" style={{ fontWeight: '600', color: row.fill_rate_percent > 60 ? 'var(--color-green)' : 'var(--color-amber)' }}>
+                    {row.fill_rate_percent}%
+                  </td>
+                  <td className="font-mono" style={{ color: 'var(--color-green)' }}>
+                    +{row.spread_captured_bps} bps
+                  </td>
+                  <td className="font-mono" style={{ color: 'var(--color-red)' }}>
+                    -{row.adverse_selection_bps} bps
+                  </td>
+                  <td className="font-mono" style={{ fontWeight: '600', color: row.net_pnl_bps >= 0 ? 'var(--color-green)' : 'var(--color-red)' }}>
+                    {row.net_pnl_bps >= 0 ? `+${row.net_pnl_bps}` : row.net_pnl_bps} bps
+                  </td>
+                  <td className="font-mono" style={{ color: row.sharpe_ratio > 0 ? 'var(--color-blue)' : 'var(--color-red)' }}>
+                    {row.sharpe_ratio}
+                  </td>
+                  <td>
+                    <span className={`status-pill ${isSelected ? 'real' : 'neutral'}`}>
+                      {isSelected ? 'SELECTED' : 'INSPECT'}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
-      {/* Selected Latency Profile Breakdown Card */}
-      <div className="glass-panel" style={{ padding: '20px' }}>
-        <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '12px' }}>
-          4-Stage Latency Pipeline Breakdown for {activeRow.latency} Profile
-        </h3>
+      {/* 4-Stage Pipeline Breakdown for selected profile */}
+      <div className="terminal-panel">
+        <div className="terminal-header">
+          <span className="panel-title">
+            4-STAGE LATENCY DECOMPOSITION FOR [{activeRow.latency.toUpperCase()}] PROFILE
+          </span>
+          <span className="font-mono" style={{ fontSize: '11px', color: 'var(--color-amber)', fontWeight: '600' }}>
+            TOTAL BUDGET: {(activeRow.latency_ns / 1000).toFixed(1)} μs
+          </span>
+        </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-          <div style={{ padding: '12px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>1. Market Data Ingress</span>
-            <div className="mono-num" style={{ fontSize: '18px', fontWeight: '700', color: 'var(--accent-cyan)', marginTop: '4px' }}>
+        <div style={{ padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
+          <div className="metric-box">
+            <span className="metric-label">1. MARKET DATA INGRESS (20%)</span>
+            <div className="metric-val font-mono" style={{ color: 'var(--color-blue)' }}>
               {(activeRow.latency_ns * 0.2 / 1000).toFixed(1)} μs
             </div>
-            <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>NIC timestamp to engine</span>
+            <span className="metric-sub">NIC hardware timestamp to engine</span>
           </div>
 
-          <div style={{ padding: '12px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>2. Strategy Compute Time</span>
-            <div className="mono-num" style={{ fontSize: '18px', fontWeight: '700', color: 'var(--accent-green)', marginTop: '4px' }}>
+          <div className="metric-box">
+            <span className="metric-label">2. STRATEGY COMPUTE (10%)</span>
+            <div className="metric-val font-mono" style={{ color: 'var(--color-green)' }}>
               {(activeRow.latency_ns * 0.1 / 1000).toFixed(1)} μs
             </div>
-            <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>C++ pricing & risk checks</span>
+            <span className="metric-sub">C++ pricing, risk & queue check</span>
           </div>
 
-          <div style={{ padding: '12px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>3. Network Wire Egress</span>
-            <div className="mono-num" style={{ fontSize: '18px', fontWeight: '700', color: 'var(--accent-amber)', marginTop: '4px' }}>
+          <div className="metric-box">
+            <span className="metric-label">3. NETWORK WIRE EGRESS (50%)</span>
+            <div className="metric-val font-mono" style={{ color: 'var(--color-amber)' }}>
               {(activeRow.latency_ns * 0.5 / 1000).toFixed(1)} μs
             </div>
-            <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Cross-connect fiber optic</span>
+            <span className="metric-sub">Fiber optic cross-connect transfer</span>
           </div>
 
-          <div style={{ padding: '12px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>4. Exchange Matching Entry</span>
-            <div className="mono-num" style={{ fontSize: '18px', fontWeight: '700', color: 'var(--accent-purple)', marginTop: '4px' }}>
+          <div className="metric-box">
+            <span className="metric-label">4. EXCHANGE GATEWAY ENTRY (20%)</span>
+            <div className="metric-val font-mono" style={{ color: 'var(--color-purple)' }}>
               {(activeRow.latency_ns * 0.2 / 1000).toFixed(1)} μs
             </div>
-            <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Matching engine queue insertion</span>
+            <span className="metric-sub">Matching engine queue insertion</span>
           </div>
         </div>
       </div>
