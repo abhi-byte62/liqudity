@@ -13,12 +13,13 @@ const API_BASE = 'http://127.0.0.1:8000';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('orderbook');
-  const [selectedMarket, setSelectedMarket] = useState('btc_liquid_balanced');
+  const [selectedMarket, setSelectedMarket] = useState('real_binance_btcusdt');
   const [markets, setMarkets] = useState([
-    { id: 'btc_liquid_balanced', name: 'BTC/USDT - Liquid Balanced Book' },
-    { id: 'btc_high_volatility', name: 'ETH/USDT - High Volatility Regime' },
-    { id: 'btc_trending_momentum', name: 'AAPL/USDT - Directional Momentum Flow' },
-    { id: 'btc_liquidity_drought', name: 'Micro-Cap - Liquidity Drought' }
+    { id: 'real_binance_btcusdt', name: 'BTC/USDT - Real Binance Spot L2/Trades', dataset_type: 'real' },
+    { id: 'btc_liquid_balanced', name: 'BTC/USDT - Liquid Balanced Book', dataset_type: 'synthetic' },
+    { id: 'btc_high_volatility', name: 'ETH/USDT - High Volatility Regime', dataset_type: 'synthetic' },
+    { id: 'btc_trending_momentum', name: 'AAPL/USDT - Directional Momentum Flow', dataset_type: 'synthetic' },
+    { id: 'btc_liquidity_drought', name: 'Micro-Cap - Liquidity Drought', dataset_type: 'synthetic' }
   ]);
 
   const [snapshot, setSnapshot] = useState(null);
@@ -26,7 +27,7 @@ export default function App() {
   const [latencyData, setLatencyData] = useState(null);
   const [isRunningSim, setIsRunningSim] = useState(false);
 
-  // Fetch initial markets
+  // Fetch available markets
   useEffect(() => {
     const fetchMarkets = async () => {
       try {
@@ -44,7 +45,7 @@ export default function App() {
     fetchMarkets();
   }, []);
 
-  // Fetch initial markets & snapshot
+  // Fetch snapshot and latency sweep
   const loadSnapshot = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/orderbook/snapshot?dataset=${selectedMarket}`);
@@ -74,7 +75,7 @@ export default function App() {
     loadLatencySweep();
   }, [selectedMarket]);
 
-  // Run backtest
+  // Run backtest simulation
   const handleRunBacktest = async (params) => {
     setIsRunningSim(true);
     try {
@@ -98,7 +99,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="app-container">
       {/* Top Application Header */}
       <Header
         markets={markets}
@@ -107,14 +108,14 @@ export default function App() {
         onRefresh={loadSnapshot}
       />
 
-      {/* Main Navigation Tabs */}
+      {/* Main Navigation Toolbar */}
       <Navigation
         activeTab={activeTab}
         onTabChange={setActiveTab}
       />
 
-      {/* Main Content Area */}
-      <main style={{ flex: 1 }}>
+      {/* Main Content Workspace */}
+      <main className="main-content">
         {activeTab === 'orderbook' && (
           <OrderBookView snapshot={snapshot} onRefresh={loadSnapshot} />
         )}
