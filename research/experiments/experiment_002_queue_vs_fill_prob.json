@@ -1,0 +1,42 @@
+{
+  "experiment_id": "EXP-002",
+  "title": "Queue Position vs Fill Probability",
+  "hypothesis": "Higher queue-ahead volume exponentially decreases the probability of execution before a market price reversal.",
+  "curve": [
+    {
+      "queue_ahead_units": 0,
+      "fill_probability": 1.0,
+      "avg_fill_time_ms": 0.5
+    },
+    {
+      "queue_ahead_units": 25,
+      "fill_probability": 0.922,
+      "avg_fill_time_ms": 3.5
+    },
+    {
+      "queue_ahead_units": 50,
+      "fill_probability": 0.844,
+      "avg_fill_time_ms": 6.5
+    },
+    {
+      "queue_ahead_units": 100,
+      "fill_probability": 0.688,
+      "avg_fill_time_ms": 12.5
+    },
+    {
+      "queue_ahead_units": 150,
+      "fill_probability": 0.531,
+      "avg_fill_time_ms": 18.5
+    },
+    {
+      "queue_ahead_units": 200,
+      "fill_probability": 0.375,
+      "avg_fill_time_ms": 24.5
+    },
+    {
+      "queue_ahead_units": 300,
+      "fill_probability": 0.062,
+      "avg_fill_time_ms": 36.5
+    }
+  ]
+}
