@@ -39,62 +39,64 @@ export default function LatencyMatrixView({ latencyData }) {
           </span>
         </div>
 
-        <table className="terminal-table">
-          <thead>
-            <tr>
-              <th>PROFILE</th>
-              <th>LATENCY (NS)</th>
-              <th>FILL RATE (%)</th>
-              <th>SPREAD CAPTURED</th>
-              <th>ADVERSE SELECTION</th>
-              <th>NET P&L</th>
-              <th>SHARPE RATIO</th>
-              <th>STATUS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sweep.map((row, idx) => {
-              const isSelected = row.latency === selectedProfile;
-              return (
-                <tr 
-                  key={idx}
-                  onClick={() => setSelectedProfile(row.latency)}
-                  style={{ 
-                    cursor: 'pointer',
-                    background: isSelected ? 'var(--bg-row-selected)' : 'transparent'
-                  }}
-                >
-                  <td className="font-mono" style={{ fontWeight: '600', color: isSelected ? 'var(--color-blue)' : 'var(--text-primary)' }}>
-                    {row.latency}
-                  </td>
-                  <td className="font-mono" style={{ color: 'var(--text-muted)' }}>
-                    {(row.latency_ns / 1000).toFixed(0)} μs
-                  </td>
-                  <td className="font-mono" style={{ fontWeight: '600', color: row.fill_rate_percent > 60 ? 'var(--color-green)' : 'var(--color-amber)' }}>
-                    {row.fill_rate_percent}%
-                  </td>
-                  <td className="font-mono" style={{ color: 'var(--color-green)' }}>
-                    +{row.spread_captured_bps} bps
-                  </td>
-                  <td className="font-mono" style={{ color: 'var(--color-red)' }}>
-                    -{row.adverse_selection_bps} bps
-                  </td>
-                  <td className="font-mono" style={{ fontWeight: '600', color: row.net_pnl_bps >= 0 ? 'var(--color-green)' : 'var(--color-red)' }}>
-                    {row.net_pnl_bps >= 0 ? `+${row.net_pnl_bps}` : row.net_pnl_bps} bps
-                  </td>
-                  <td className="font-mono" style={{ color: row.sharpe_ratio > 0 ? 'var(--color-blue)' : 'var(--color-red)' }}>
-                    {row.sharpe_ratio}
-                  </td>
-                  <td>
-                    <span className={`status-pill ${isSelected ? 'real' : 'neutral'}`}>
-                      {isSelected ? 'SELECTED' : 'INSPECT'}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="terminal-table">
+            <thead>
+              <tr>
+                <th>PROFILE</th>
+                <th>LATENCY (NS)</th>
+                <th>FILL RATE (%)</th>
+                <th>SPREAD CAPTURED</th>
+                <th>ADVERSE SELECTION</th>
+                <th>NET P&L</th>
+                <th>SHARPE RATIO</th>
+                <th>STATUS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sweep.map((row, idx) => {
+                const isSelected = row.latency === selectedProfile;
+                return (
+                  <tr 
+                    key={idx}
+                    onClick={() => setSelectedProfile(row.latency)}
+                    style={{ 
+                      cursor: 'pointer',
+                      background: isSelected ? 'var(--bg-row-selected)' : 'transparent'
+                    }}
+                  >
+                    <td className="font-mono" style={{ fontWeight: '600', color: isSelected ? 'var(--color-blue)' : 'var(--text-primary)' }}>
+                      {row.latency}
+                    </td>
+                    <td className="font-mono" style={{ color: 'var(--text-muted)' }}>
+                      {(row.latency_ns / 1000).toFixed(0)} μs
+                    </td>
+                    <td className="font-mono" style={{ fontWeight: '600', color: row.fill_rate_percent > 60 ? 'var(--color-green)' : 'var(--color-amber)' }}>
+                      {row.fill_rate_percent}%
+                    </td>
+                    <td className="font-mono" style={{ color: 'var(--color-green)' }}>
+                      +{row.spread_captured_bps} bps
+                    </td>
+                    <td className="font-mono" style={{ color: 'var(--color-red)' }}>
+                      -{row.adverse_selection_bps} bps
+                    </td>
+                    <td className="font-mono" style={{ fontWeight: '600', color: row.net_pnl_bps >= 0 ? 'var(--color-green)' : 'var(--color-red)' }}>
+                      {row.net_pnl_bps >= 0 ? `+${row.net_pnl_bps}` : row.net_pnl_bps} bps
+                    </td>
+                    <td className="font-mono" style={{ color: row.sharpe_ratio > 0 ? 'var(--color-blue)' : 'var(--color-red)' }}>
+                      {row.sharpe_ratio}
+                    </td>
+                    <td>
+                      <span className={`status-pill ${isSelected ? 'real' : 'neutral'}`}>
+                        {isSelected ? 'SELECTED' : 'INSPECT'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* 4-Stage Pipeline Breakdown for selected profile */}
@@ -108,37 +110,37 @@ export default function LatencyMatrixView({ latencyData }) {
           </span>
         </div>
 
-        <div style={{ padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
-          <div className="metric-box">
-            <span className="metric-label">1. MARKET DATA INGRESS (20%)</span>
+        <div style={{ padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+          <div className="metric-box" style={{ minWidth: 0 }}>
+            <span className="metric-label" style={{ wordBreak: 'break-word' }}>1. INGRESS (20%)</span>
             <div className="metric-val font-mono" style={{ color: 'var(--color-blue)' }}>
               {(activeRow.latency_ns * 0.2 / 1000).toFixed(1)} μs
             </div>
-            <span className="metric-sub">NIC hardware timestamp to engine</span>
+            <span className="metric-sub" style={{ fontSize: '10px' }}>NIC hardware timestamp</span>
           </div>
 
-          <div className="metric-box">
-            <span className="metric-label">2. STRATEGY COMPUTE (10%)</span>
+          <div className="metric-box" style={{ minWidth: 0 }}>
+            <span className="metric-label" style={{ wordBreak: 'break-word' }}>2. STRATEGY (10%)</span>
             <div className="metric-val font-mono" style={{ color: 'var(--color-green)' }}>
               {(activeRow.latency_ns * 0.1 / 1000).toFixed(1)} μs
             </div>
-            <span className="metric-sub">C++ pricing, risk & queue check</span>
+            <span className="metric-sub" style={{ fontSize: '10px' }}>C++ pricing & risk check</span>
           </div>
 
-          <div className="metric-box">
-            <span className="metric-label">3. NETWORK WIRE EGRESS (50%)</span>
+          <div className="metric-box" style={{ minWidth: 0 }}>
+            <span className="metric-label" style={{ wordBreak: 'break-word' }}>3. WIRE EGRESS (50%)</span>
             <div className="metric-val font-mono" style={{ color: 'var(--color-amber)' }}>
               {(activeRow.latency_ns * 0.5 / 1000).toFixed(1)} μs
             </div>
-            <span className="metric-sub">Fiber optic cross-connect transfer</span>
+            <span className="metric-sub" style={{ fontSize: '10px' }}>Fiber cross-connect</span>
           </div>
 
-          <div className="metric-box">
-            <span className="metric-label">4. EXCHANGE GATEWAY ENTRY (20%)</span>
+          <div className="metric-box" style={{ minWidth: 0 }}>
+            <span className="metric-label" style={{ wordBreak: 'break-word' }}>4. GATEWAY (20%)</span>
             <div className="metric-val font-mono" style={{ color: 'var(--color-purple)' }}>
               {(activeRow.latency_ns * 0.2 / 1000).toFixed(1)} μs
             </div>
-            <span className="metric-sub">Matching engine queue insertion</span>
+            <span className="metric-sub" style={{ fontSize: '10px' }}>Matching queue insertion</span>
           </div>
         </div>
       </div>
