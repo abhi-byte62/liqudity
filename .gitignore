@@ -1,0 +1,31 @@
+# Binaries and build artifacts
+*.exe
+*.o
+*.obj
+*.dll
+*.so
+*.dylib
+build/
+bin/
+.cache/
+
+# Node / Frontend
+node_modules/
+dist/
+.vite/
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+env/
+venv/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
