@@ -41,6 +41,7 @@ public:
 
     bool add_order(OrderId order_id, Side side, Price price, Quantity quantity, TimestampNs ts) {
         if (quantity == 0 || price <= 0) return false;
+        if (side != Side::BUY && side != Side::SELL) return false;
 
         // Register in order index
         order_location_[order_id] = {side, price};
@@ -62,8 +63,6 @@ public:
                               std::forward_as_tuple(price, tick_size_));
             }
             asks_[price].add_order(order);
-        } else {
-            return false;
         }
 
         total_orders_processed_++;
