@@ -1,5 +1,5 @@
 import React from 'react';
-import { Target, TrendingDown, DollarSign, ShieldAlert, AlertCircle, ArrowDownRight, Layers } from 'lucide-react';
+import { TrendingDown } from 'lucide-react';
 
 export default function AdverseSelectionView({ simResult }) {
   const markouts = simResult?.markouts || [
@@ -20,146 +20,128 @@ export default function AdverseSelectionView({ simResult }) {
   const netPnlBps = simResult?.net_pnl_bps ?? (spreadCaptureBps - adverseLossBps - feesPaidBps - slippageBps - inventoryCostBps);
 
   return (
-    <div style={{ padding: '0 20px 24px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* Header Banner */}
-      <div className="glass-panel" style={{ padding: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-          <Target size={20} color="var(--accent-red)" />
-          <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#f8fafc' }}>
-            Adverse Selection & Post-Fill Markout Engine
-          </h2>
-          <span className="badge badge-red">Quant Research Core</span>
-        </div>
-        <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-          Quantifying the trade-off: A liquidity provider captures the bid-ask spread but gets adversely selected when informed order flow moves the market immediately post-fill.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {/* Header Info */}
+      <div className="terminal-panel" style={{ padding: '12px 16px' }}>
+        <span className="panel-title" style={{ fontSize: '13px' }}>
+          <TrendingDown size={14} color="var(--color-red)" />
+          POST-TRADE MARKOUT & ADVERSE SELECTION DECOMPOSITION
+        </span>
+        <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+          Evaluating post-fill price drift: When passive limit orders get filled, what is the probability and magnitude of immediate price movement against the quote?
         </p>
       </div>
 
-      {/* Expected Economics Decomposition Formula Card */}
-      <div className="glass-panel" style={{ padding: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
-          <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
-            Expected Economics Decomposition: E[PnL]
-          </h3>
-          <span className={`badge ${netPnlBps >= 0 ? 'badge-green' : 'badge-red'}`}>
-            Net Expected P&L: {netPnlBps >= 0 ? `+${netPnlBps.toFixed(2)} bps` : `${netPnlBps.toFixed(2)} bps`}
+      {/* Statement-style Expected Economics Decomposition */}
+      <div className="terminal-panel">
+        <div className="terminal-header">
+          <span className="panel-title">
+            EXPECTED LIQUIDITY PROVISION STATEMENT: E[PnL]
+          </span>
+          <span className={`status-pill ${netPnlBps >= 0 ? 'real' : 'danger'}`}>
+            NET REALIZED EDGE: {netPnlBps >= 0 ? `+${netPnlBps.toFixed(2)} bps` : `${netPnlBps.toFixed(2)} bps`}
           </span>
         </div>
 
-        {/* Math Formula Card Visual */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-          gap: '12px',
-          background: 'rgba(11, 19, 32, 0.6)',
-          padding: '16px',
-          borderRadius: '10px',
-          border: '1px solid var(--border-color)'
-        }}>
-          {/* Spread Capture */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>+ Spread Capture</span>
-            <div className="mono-num" style={{ fontSize: '20px', fontWeight: '700', color: 'var(--accent-green)' }}>
-              +{spreadCaptureBps.toFixed(2)} <span style={{ fontSize: '12px' }}>bps</span>
+        <div style={{ padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '8px' }}>
+          <div className="metric-box">
+            <span className="metric-label">+ SPREAD CAPTURE</span>
+            <div className="metric-val font-mono" style={{ color: 'var(--color-green)' }}>
+              +{spreadCaptureBps.toFixed(2)} <span style={{ fontSize: '11px' }}>bps</span>
             </div>
-            <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Passive premium</span>
+            <span className="metric-sub">Gross bid-ask half-spread</span>
           </div>
 
-          {/* Adverse Selection */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>- Adverse Selection</span>
-            <div className="mono-num" style={{ fontSize: '20px', fontWeight: '700', color: 'var(--accent-red)' }}>
-              -{adverseLossBps.toFixed(2)} <span style={{ fontSize: '12px' }}>bps</span>
+          <div className="metric-box">
+            <span className="metric-label">- ADVERSE SELECTION</span>
+            <div className="metric-val font-mono" style={{ color: 'var(--color-red)' }}>
+              -{adverseLossBps.toFixed(2)} <span style={{ fontSize: '11px' }}>bps</span>
             </div>
-            <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Post-fill toxic drift</span>
+            <span className="metric-sub">Toxic informed flow drift</span>
           </div>
 
-          {/* Exchange Fees */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>- Fees (Maker)</span>
-            <div className="mono-num" style={{ fontSize: '20px', fontWeight: '700', color: feesPaidBps <= 0 ? 'var(--accent-green)' : 'var(--accent-amber)' }}>
-              {feesPaidBps <= 0 ? `+${Math.abs(feesPaidBps).toFixed(2)}` : `-${feesPaidBps.toFixed(2)}`} <span style={{ fontSize: '12px' }}>bps</span>
+          <div className="metric-box">
+            <span className="metric-label">- EXCHANGE MAKER FEE</span>
+            <div className="metric-val font-mono" style={{ color: feesPaidBps <= 0 ? 'var(--color-green)' : 'var(--color-amber)' }}>
+              {feesPaidBps <= 0 ? `+${Math.abs(feesPaidBps).toFixed(2)}` : `-${feesPaidBps.toFixed(2)}`} <span style={{ fontSize: '11px' }}>bps</span>
             </div>
-            <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Maker rebate/fee</span>
+            <span className="metric-sub">Exchange liquidity rebate/fee</span>
           </div>
 
-          {/* Slippage */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>- Latency Slippage</span>
-            <div className="mono-num" style={{ fontSize: '20px', fontWeight: '700', color: 'var(--accent-amber)' }}>
-              -{slippageBps.toFixed(2)} <span style={{ fontSize: '12px' }}>bps</span>
+          <div className="metric-box">
+            <span className="metric-label">- LATENCY SLIPPAGE</span>
+            <div className="metric-val font-mono" style={{ color: 'var(--color-amber)' }}>
+              -{slippageBps.toFixed(2)} <span style={{ fontSize: '11px' }}>bps</span>
             </div>
-            <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Queue degradation</span>
+            <span className="metric-sub">Delayed quote update penalty</span>
           </div>
 
-          {/* Inventory Cost */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>- Inventory Cost</span>
-            <div className="mono-num" style={{ fontSize: '20px', fontWeight: '700', color: 'var(--accent-purple)' }}>
-              -{inventoryCostBps.toFixed(2)} <span style={{ fontSize: '12px' }}>bps</span>
+          <div className="metric-box">
+            <span className="metric-label">- INVENTORY COST</span>
+            <div className="metric-val font-mono" style={{ color: 'var(--color-purple)' }}>
+              -{inventoryCostBps.toFixed(2)} <span style={{ fontSize: '11px' }}>bps</span>
             </div>
-            <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Risk penalty</span>
+            <span className="metric-sub">Avellaneda inventory risk</span>
           </div>
         </div>
       </div>
 
-      {/* Markout Horizons Multi-Horizon Table & Visualizer */}
-      <div className="glass-panel" style={{ padding: '20px' }}>
-        <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#f8fafc', marginBottom: '14px' }}>
-          Multi-Horizon Post-Fill Markout Curves
-        </h3>
-
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', textAlign: 'left', height: '36px' }}>
-                <th style={{ padding: '8px 12px' }}>Horizon (τ)</th>
-                <th style={{ padding: '8px 12px' }}>P(Adverse Move)</th>
-                <th style={{ padding: '8px 12px' }}>Mean Markout</th>
-                <th style={{ padding: '8px 12px' }}>Adverse Loss (bps)</th>
-                <th style={{ padding: '8px 12px' }}>Toxicity Meter</th>
-              </tr>
-            </thead>
-            <tbody>
-              {markouts.map((m, idx) => {
-                const advProbPercent = (m.adverse_prob * 100).toFixed(1);
-                return (
-                  <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', height: '44px' }}>
-                    <td style={{ padding: '8px 12px', fontWeight: '700', color: 'var(--accent-cyan)' }}>
-                      {m.horizon}
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <span className="mono-num" style={{ fontWeight: '600', color: m.adverse_prob > 0.6 ? 'var(--accent-red)' : 'var(--accent-amber)' }}>
-                        {advProbPercent}%
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <span className="mono-num" style={{ fontWeight: '600', color: m.mean_markout_bps < 0 ? 'var(--accent-red)' : 'var(--accent-green)' }}>
-                        {m.mean_markout_bps > 0 ? `+${m.mean_markout_bps.toFixed(4)}` : m.mean_markout_bps.toFixed(4)} bps
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <span className="mono-num" style={{ fontWeight: '600', color: 'var(--accent-red)' }}>
-                        -{m.mean_adverse_loss_bps.toFixed(4)} bps
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      {/* Visual probability bar */}
-                      <div style={{ width: '120px', height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div style={{
-                          width: `${advProbPercent}%`,
-                          height: '100%',
-                          background: m.adverse_prob > 0.6 ? 'var(--accent-red)' : 'var(--accent-amber)',
-                          borderRadius: '4px'
-                        }}></div>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {/* Multi-Horizon Table */}
+      <div className="terminal-panel">
+        <div className="terminal-header">
+          <span className="panel-title">
+            EMPIRICAL MULTI-HORIZON MARKOUT CURVES
+          </span>
+          <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+            SIGN CONVENTION: POSITIVE = MAKER GAIN, NEGATIVE = ADVERSE LOSS
+          </span>
         </div>
+
+        <table className="terminal-table">
+          <thead>
+            <tr>
+              <th>HORIZON (τ)</th>
+              <th>HORIZON (NS)</th>
+              <th>P(ADVERSE DRIFT)</th>
+              <th>MEAN MARKOUT</th>
+              <th>MEAN ADVERSE LOSS</th>
+              <th>TOXICITY PROBABILITY</th>
+            </tr>
+          </thead>
+          <tbody>
+            {markouts.map((m, idx) => {
+              const advPercent = (m.adverse_prob * 100).toFixed(1);
+              return (
+                <tr key={idx}>
+                  <td className="font-mono" style={{ fontWeight: '600', color: 'var(--color-blue)' }}>
+                    {m.horizon}
+                  </td>
+                  <td className="font-mono" style={{ color: 'var(--text-muted)' }}>
+                    {m.horizon_ns.toLocaleString()} ns
+                  </td>
+                  <td className="font-mono" style={{ fontWeight: '600', color: m.adverse_prob > 0.6 ? 'var(--color-red)' : 'var(--color-amber)' }}>
+                    {advPercent}%
+                  </td>
+                  <td className="font-mono" style={{ color: m.mean_markout_bps < 0 ? 'var(--color-red)' : 'var(--color-green)' }}>
+                    {m.mean_markout_bps > 0 ? `+${m.mean_markout_bps.toFixed(4)}` : m.mean_markout_bps.toFixed(4)} bps
+                  </td>
+                  <td className="font-mono" style={{ color: 'var(--color-red)' }}>
+                    -{m.mean_adverse_loss_bps.toFixed(4)} bps
+                  </td>
+                  <td style={{ width: '160px' }}>
+                    <div style={{ width: '100%', height: '4px', background: 'var(--border-subtle)', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${advPercent}%`,
+                        height: '100%',
+                        background: m.adverse_prob > 0.6 ? 'var(--color-red)' : 'var(--color-amber)'
+                      }} />
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
