@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Database, Cpu, Clock } from 'lucide-react';
+import { RefreshCw, Cpu, Clock } from 'lucide-react';
 
 export default function Header({ markets, selectedMarket, onSelectMarket, onRefresh }) {
   const currentMarketObj = markets.find(m => m.id === selectedMarket);
