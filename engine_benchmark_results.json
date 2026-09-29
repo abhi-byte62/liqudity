@@ -1,0 +1,15 @@
+{
+  "total_events": 150000,
+  "lob_throughput_meps": 3.88913,
+  "lob_avg_ns": 257.127,
+  "lob_p50_ns": 0,
+  "lob_p90_ns": 1114,
+  "lob_p95_ns": 1998,
+  "lob_p99_ns": 3018,
+  "lob_p99_9_ns": 5284,
+  "sim_throughput_meps": 0.016559,
+  "sim_total_time_ms": 9058.5,
+  "total_fills": 1966,
+  "net_pnl_bps": -6.34478,
+  "sharpe_ratio": 0
+}
