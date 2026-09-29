@@ -108,10 +108,10 @@ LiquidityLens maintains a strict distinction between real and synthetic feeds:
 
 All 7 research experiments are executed via `python research/experiments.py`:
 
-* **EXP-001 (OBI vs. Short-Horizon Mid-Price Movement):** Evaluates whether order-book imbalance ($\text{OBI} = \frac{Q_b - Q_a}{Q_b + Q_a}$) contains measurable predictive information about future mid-price changes over horizons from $10\,\text{ms}$ to $1\,\text{s}$.
-* **EXP-002 (Queue Position vs. Fill Probability):** Measures empirical fill probability and time-to-fill as a function of normalized initial queue depth ($Q_{\text{ahead}} / Q_{\text{level}}$).
-* **EXP-003 & EXP-004 (Latency vs. Fill Rate & Adverse Selection):** Evaluates how order transmission delays ($10\,\mu\text{s} \to 500\,\mu\text{s}$) degrade passive fill rates and increase adverse selection markouts.
-* **EXP-005 (Spread vs. Expected P&L):** Analyzes the trade-off between quoting wider spreads (lower fill probability, higher edge per trade) versus narrower spreads (higher fill probability, higher adverse selection).
+* **EXP-001 (OBI vs. Short-Horizon Mid-Price Movement):** Replays the event stream dynamically with strict zero look-ahead bias, evaluating Pearson correlation $r$, regression slope, $R^2$, and $p$-value between top-level order-book imbalance ($\text{OBI} = \frac{Q_b - Q_a}{Q_b + Q_a}$) and forward mid-price returns across horizons from $10\,\text{ms}$ to $1\,\text{s}$.
+* **EXP-002 (Queue Position vs. Fill Probability):** Executes a controlled FIFO simulation across 17,500 total simulated order placements ($2,500$ trials across 7 queue-ahead tiers under fixed seed $= 42$), measuring empirical fill probabilities, 95% Wilson binomial confidence intervals, and $P_{50}/P_{90}$ fill times.
+* **EXP-003 & EXP-004 (Latency vs. Fill Rate & Adverse Selection):** Evaluates how order transmission delays ($10\,\mu\text{s} \to 500\,\mu\text{s}$) degrade passive fill rates and increase adverse selection markouts across 6 latency tiers.
+* **EXP-005 (Spread vs. Expected P&L):** Analyzes the economic trade-off between quoting wider spreads (lower fill probability, higher edge per trade) versus narrower spreads (higher fill probability, higher adverse selection).
 * **EXP-006 (Volatility vs. Adverse Selection):** Measures how local microstructure volatility scales the magnitude of post-fill adverse price movement.
 * **EXP-007 (Synthetic vs. Real Market Data Comparison):** Cross-validates synthetic Hawkes microstructure distributions against real Binance trade flow.
 
