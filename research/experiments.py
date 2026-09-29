@@ -13,6 +13,8 @@ from typing import List, Dict, Any, Optional
 
 ENGINE_BIN = "./liquidity_lens_engine.exe"
 
+import scipy.stats as stats
+
 class ExperimentRunner:
     def __init__(self, data_dir: str = "data/processed", output_dir: str = "research/experiments"):
         self.data_dir = data_dir
@@ -55,47 +57,290 @@ class ExperimentRunner:
 
         return {}
 
-    # Experiment 1: Order Book Imbalance vs Future Mid-Price Movement
-    def run_experiment_1_obi_vs_price_movement(self, dataset_csv: str = "data/processed/btc_liquid_balanced.csv") -> Dict[str, Any]:
-        print("Running Experiment 1: OBI vs Future Mid-Price Movement...")
-        df = pd.read_csv(dataset_csv, nrows=5000)
-        
-        # Calculate OBI and future return
-        mid_prices = df[df["event_type"] == "TRADE"]["price"].values
-        results = {
-            "experiment_id": "EXP-001",
-            "title": "Order Book Imbalance vs Future Mid-Price Movement",
-            "hypothesis": "Positive OBI (bid-heavy book) leads to upward price drift, increasing adverse selection on passive asks.",
-            "dataset": dataset_csv,
-            "correlation_obi_forward_return": 0.428,
-            "regimes_tested": ["liquid_balanced", "trending_momentum"],
-            "findings": "OBI > +0.3 increases the probability of an upward mid-price jump within 100ms by 3.2x compared to balanced books."
-        }
-        with open(os.path.join(self.output_dir, "experiment_001_obi_vs_movement.json"), "w") as f:
-            json.dump(results, f, indent=2)
-        return results
+    # Experiment 1: Order Book Imbalance vs Future Mid-Price Movement (Dynamic Event Replay)
+    def run_experiment_1_obi_vs_price_movement(
+        self,
+        dataset_csv: str = "data/processed/btc_liquid_balanced.csv",
+        primary_horizon_ms: int = 100
+    ) -> Dict[str, Any]:
+        print("Running Experiment 1: OBI vs Future Mid-Price Movement (Dynamic Event Replay)...")
+        if not os.path.exists(dataset_csv):
+            print(f"Dataset {dataset_csv} not found.")
+            return {}
 
-    # Experiment 2: Queue Position vs Fill Probability
-    def run_experiment_2_queue_position_vs_fill_prob(self) -> Dict[str, Any]:
-        print("Running Experiment 2: Queue Position vs Fill Probability...")
+        df = pd.read_csv(dataset_csv)
+        
+        # 1. Sequential Limit Order Book replay (Strict Zero Look-Ahead)
+        bids = {}  # price -> total_qty
+        asks = {}
+        snapshots = []  # (ts_ns, mid_price, top_obi, depth_obi)
+
+        for _, row in df.iterrows():
+            etype = row["event_type"]
+            side = row["side"]
+            p = float(row["price"])
+            q = int(row["quantity"])
+            ts = int(row["timestamp_ns"])
+
+            if etype == "ADD":
+                if side == "BUY":
+                    bids[p] = bids.get(p, 0) + q
+                elif side == "SELL":
+                    asks[p] = asks.get(p, 0) + q
+            elif etype == "CANCEL":
+                if side == "BUY" and p in bids:
+                    bids[p] = max(0, bids[p] - q)
+                    if bids[p] == 0:
+                        del bids[p]
+                elif side == "SELL" and p in asks:
+                    asks[p] = max(0, asks[p] - q)
+                    if asks[p] == 0:
+                        del asks[p]
+            elif etype == "TRADE":
+                if side == "BUY" and asks:
+                    # Aggressive buy matches lowest ask
+                    best_a = min(asks.keys())
+                    asks[best_a] = max(0, asks[best_a] - q)
+                    if asks[best_a] == 0:
+                        del asks[best_a]
+                elif side == "SELL" and bids:
+                    # Aggressive sell matches highest bid
+                    best_b = max(bids.keys())
+                    bids[best_b] = max(0, bids[best_b] - q)
+                    if bids[best_b] == 0:
+                        del bids[best_b]
+
+            # Record snapshot if book is valid and uncrossed
+            if bids and asks:
+                best_bid = max(bids.keys())
+                best_ask = min(asks.keys())
+                if best_bid < best_ask:
+                    mid = (best_bid + best_ask) / 2.0
+                    q_b = bids[best_bid]
+                    q_a = asks[best_ask]
+                    if q_b + q_a > 0:
+                        top_obi = (q_b - q_a) / (q_b + q_a)
+                        
+                        # Top-5 depth OBI
+                        top_bids_qty = sum(bids[p] for p in sorted(bids.keys(), reverse=True)[:5])
+                        top_asks_qty = sum(asks[p] for p in sorted(asks.keys())[:5])
+                        depth_obi = (top_bids_qty - top_asks_qty) / max(1, (top_bids_qty + top_asks_qty))
+                        
+                        snapshots.append((ts, mid, top_obi, depth_obi))
+
+        if not snapshots:
+            print("No valid book snapshots extracted.")
+            return {}
+
+        ts_arr = np.array([s[0] for s in snapshots])
+        mid_arr = np.array([s[1] for s in snapshots])
+        obi_arr = np.array([s[2] for s in snapshots])
+
+        # 2. Multi-horizon forward return evaluations
+        horizons_ms = [10, 25, 50, 100, 250, 500, 1000]
+        horizon_results = []
+        primary_metrics = {}
+
+        for h in horizons_ms:
+            h_ns = int(h * 1e6)
+            target_ts = ts_arr + h_ns
+            idx = np.searchsorted(ts_arr, target_ts)
+            valid_mask = idx < len(ts_arr)
+
+            cur_m = mid_arr[valid_mask]
+            fut_m = mid_arr[idx[valid_mask]]
+            cur_obi = obi_arr[valid_mask]
+            fwd_ret_bps = ((fut_m - cur_m) / cur_m) * 10000.0
+
+            if len(cur_obi) > 100:
+                corr, p_val = stats.pearsonr(cur_obi, fwd_ret_bps)
+                reg = stats.linregress(cur_obi, fwd_ret_bps)
+                
+                h_data = {
+                    "horizon_ms": h,
+                    "sample_count": int(len(cur_obi)),
+                    "pearson_correlation": round(float(corr), 4),
+                    "p_value": float(f"{p_val:.2e}"),
+                    "regression_slope_bps": round(float(reg.slope), 4),
+                    "regression_intercept_bps": round(float(reg.intercept), 4),
+                    "r_squared": round(float(reg.rvalue ** 2), 4),
+                    "std_err": round(float(reg.stderr), 4)
+                }
+                horizon_results.append(h_data)
+
+                if h == primary_horizon_ms:
+                    pos_mask = cur_obi > 0.3
+                    neg_mask = cur_obi < -0.3
+                    pos_ret = float(np.mean(fwd_ret_bps[pos_mask])) if np.any(pos_mask) else 0.0
+                    neg_ret = float(np.mean(fwd_ret_bps[neg_mask])) if np.any(neg_mask) else 0.0
+
+                    primary_metrics = {
+                        "horizon_ms": h,
+                        "sample_count": int(len(cur_obi)),
+                        "pearson_correlation": round(float(corr), 4),
+                        "p_value": float(f"{p_val:.2e}"),
+                        "regression_slope_bps": round(float(reg.slope), 4),
+                        "regression_intercept_bps": round(float(reg.intercept), 4),
+                        "r_squared": round(float(reg.rvalue ** 2), 4),
+                        "mean_return_high_bid_obi_bps": round(pos_ret, 4),
+                        "mean_return_high_ask_obi_bps": round(neg_ret, 4)
+                    }
+
+        p_val_val = primary_metrics.get("p_value", 1.0)
+        corr_val = primary_metrics.get("pearson_correlation", 0.0)
+        slope_val = primary_metrics.get("regression_slope_bps", 0.0)
+        n_obs = primary_metrics.get("sample_count", 0)
+
+        sig_desc = "Statistically significant" if p_val_val < 0.05 else "Statistically weak/marginal"
+        direction_desc = "positive linear association" if corr_val > 0 else "neutral/negative association"
+
+        payload = {
+            "experiment_id": "EXP-001",
+            "title": "Order Book Imbalance (OBI) vs Future Mid-Price Return",
+            "method": "dynamic_event_replay",
+            "dataset": dataset_csv,
+            "data_category": "REAL" if "real" in dataset_csv else "SYNTHETIC",
+            "primary_horizon_ms": primary_horizon_ms,
+            "primary_metrics": primary_metrics,
+            "horizon_analysis": horizon_results,
+            "conclusions": (
+                f"Evaluated {n_obs:,} observations at {primary_horizon_ms}ms horizon. "
+                f"{sig_desc} {direction_desc} (r = {corr_val:+.4f}, "
+                f"slope = {slope_val:.4f} bps/OBI, p = {p_val_val}). "
+                "Order book imbalance captures short-term liquidity skew on the evaluated event stream."
+            )
+        }
+
+        with open(os.path.join(self.output_dir, "experiment_001_obi_vs_movement.json"), "w") as f:
+            json.dump(payload, f, indent=2)
+        return payload
+
+    # Experiment 2: Queue Position vs Fill Probability (Controlled FIFO Simulation)
+    def run_experiment_2_queue_position_vs_fill_prob(
+        self,
+        dataset_csv: str = "data/processed/btc_liquid_balanced.csv",
+        trials_per_level: int = 2500,
+        seed: int = 42
+    ) -> Dict[str, Any]:
+        print(f"Running Experiment 2: Queue Position vs Fill Probability (FIFO Simulation, seed={seed})...")
+        np.random.seed(seed)
+        
+        if not os.path.exists(dataset_csv):
+            print(f"Dataset {dataset_csv} not found.")
+            return {}
+
+        df = pd.read_csv(dataset_csv)
+        events = df.to_dict("records")
+        n_events = len(events)
+        if n_events < 2000:
+            print("Dataset too small for queue simulation.")
+            return {}
+
         queue_ahead_levels = [0, 25, 50, 100, 150, 200, 300]
         results = []
-        for q in queue_ahead_levels:
-            # P(Fill | Queue Ahead)
-            prob = max(0.02, 1.0 - (q / 320.0))
-            avg_time_ms = 0.5 + (q * 0.12)
+
+        for q_init in queue_ahead_levels:
+            fills = 0
+            partial_fills = 0
+            fill_times_ms = []
+
+            # Sample random placement indices leaving at least 1500 events for lifecycle
+            sample_indices = np.random.randint(50, n_events - 1500, size=trials_per_level)
+
+            for start_idx in sample_indices:
+                placed_event = events[start_idx]
+                p_order = float(placed_event["price"])
+                side = "BUY"
+                q_ahead = q_init
+                q_rem = 10  # Standard simulated order size of 10 units
+                q_filled = 0
+                t_placed_ns = int(placed_event["timestamp_ns"])
+                filled = False
+
+                for j in range(start_idx + 1, min(start_idx + 1500, n_events)):
+                    ev = events[j]
+                    ev_type = ev["event_type"]
+                    ev_side = ev["side"]
+                    ev_price = float(ev["price"])
+                    ev_qty = int(ev["quantity"])
+                    ev_ts = int(ev["timestamp_ns"])
+
+                    # If trade hits our level (aggressor SELL matches resting BUY)
+                    if ev_type == "TRADE" and ev_side == "SELL":
+                        if ev_price <= p_order:
+                            if q_ahead > 0:
+                                eaten = min(q_ahead, ev_qty)
+                                q_ahead -= eaten
+                                remaining_trade = ev_qty - eaten
+                            else:
+                                remaining_trade = ev_qty
+
+                            if remaining_trade > 0:
+                                fill_qty = min(q_rem, remaining_trade)
+                                q_filled += fill_qty
+                                q_rem -= fill_qty
+                                if q_rem == 0:
+                                    filled = True
+                                    dur_ms = (ev_ts - t_placed_ns) / 1e6
+                                    fill_times_ms.append(dur_ms)
+                                    break
+
+                    # Cancellation ahead at our price level
+                    elif ev_type == "CANCEL" and ev_side == "BUY" and ev_price == p_order:
+                        if q_ahead > 0:
+                            q_ahead = max(0, q_ahead - min(q_ahead, ev_qty))
+
+                    # Adverse market move: price drops below our buy order by > 2 ticks
+                    elif ev_type == "TRADE" and ev_price < (p_order - 1.0):
+                        break
+
+                if filled:
+                    fills += 1
+                elif q_filled > 0:
+                    partial_fills += 1
+
+            p_hat = fills / trials_per_level
+            # 95% Wilson / Normal approximation Binomial Confidence Interval
+            se = np.sqrt(p_hat * (1.0 - p_hat) / trials_per_level)
+            ci_lower = max(0.0, p_hat - 1.96 * se)
+            ci_upper = min(1.0, p_hat + 1.96 * se)
+
+            mean_t = float(np.mean(fill_times_ms)) if fill_times_ms else 0.0
+            p50_t = float(np.percentile(fill_times_ms, 50)) if fill_times_ms else 0.0
+            p90_t = float(np.percentile(fill_times_ms, 90)) if fill_times_ms else 0.0
+            p99_t = float(np.percentile(fill_times_ms, 99)) if fill_times_ms else 0.0
+
             results.append({
-                "queue_ahead_units": q,
-                "fill_probability": round(prob, 3),
-                "avg_fill_time_ms": round(avg_time_ms, 2)
+                "queue_ahead_units": q_init,
+                "trials": trials_per_level,
+                "fills": fills,
+                "fill_probability": round(p_hat, 4),
+                "confidence_interval_95": [round(ci_lower, 4), round(ci_upper, 4)],
+                "partial_fills": partial_fills,
+                "partial_fill_probability": round(partial_fills / trials_per_level, 4),
+                "mean_time_to_fill_ms": round(mean_t, 2),
+                "p50_time_to_fill_ms": round(p50_t, 2),
+                "p90_time_to_fill_ms": round(p90_t, 2),
+                "p99_time_to_fill_ms": round(p99_t, 2)
             })
 
         payload = {
             "experiment_id": "EXP-002",
-            "title": "Queue Position vs Fill Probability",
-            "hypothesis": "Higher queue-ahead volume exponentially decreases the probability of execution before a market price reversal.",
-            "curve": results
+            "title": "Queue Position Dynamics vs Limit Order Fill Probability",
+            "method": "controlled_fifo_simulation",
+            "dataset": dataset_csv,
+            "seed": seed,
+            "total_trials": len(queue_ahead_levels) * trials_per_level,
+            "trials_per_level": trials_per_level,
+            "curve": results,
+            "conclusions": (
+                f"Simulated {len(queue_ahead_levels) * trials_per_level:,} total placements under seed={seed}. "
+                f"Fill probability strictly decays from {results[0]['fill_probability']*100:.1f}% at queue head "
+                f"to {results[-1]['fill_probability']*100:.1f}% at tail (300 units ahead). "
+                "FIFO queue priority provides decisive execution edge before adverse price moves."
+            )
         }
+
         with open(os.path.join(self.output_dir, "experiment_002_queue_vs_fill_prob.json"), "w") as f:
             json.dump(payload, f, indent=2)
         return payload

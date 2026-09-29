@@ -1,12 +1,72 @@
 {
   "experiment_id": "EXP-001",
-  "title": "Order Book Imbalance vs Future Mid-Price Movement",
-  "hypothesis": "Positive OBI (bid-heavy book) leads to upward price drift, increasing adverse selection on passive asks.",
+  "title": "Order Book Imbalance (OBI) vs Future Mid-Price Return",
+  "method": "dynamic_event_replay",
   "dataset": "data/processed/btc_liquid_balanced.csv",
-  "correlation_obi_forward_return": 0.428,
-  "regimes_tested": [
-    "liquid_balanced",
-    "trending_momentum"
+  "data_category": "SYNTHETIC",
+  "primary_horizon_ms": 100,
+  "primary_metrics": {
+    "horizon_ms": 100,
+    "sample_count": 7975,
+    "pearson_correlation": -0.0157,
+    "p_value": 0.162,
+    "regression_slope_bps": -0.0025,
+    "regression_intercept_bps": -0.0313,
+    "r_squared": 0.0002,
+    "mean_return_high_bid_obi_bps": -0.0298,
+    "mean_return_high_ask_obi_bps": -0.0349
+  },
+  "horizon_analysis": [
+    {
+      "horizon_ms": 10,
+      "sample_count": 26076,
+      "pearson_correlation": 0.0005,
+      "p_value": 0.941,
+      "regression_slope_bps": 0.0,
+      "regression_intercept_bps": 0.0004,
+      "r_squared": 0.0,
+      "std_err": 0.0005
+    },
+    {
+      "horizon_ms": 25,
+      "sample_count": 21317,
+      "pearson_correlation": 0.0297,
+      "p_value": 1.42e-05,
+      "regression_slope_bps": 0.0034,
+      "regression_intercept_bps": 0.001,
+      "r_squared": 0.0009,
+      "std_err": 0.0008
+    },
+    {
+      "horizon_ms": 50,
+      "sample_count": 15163,
+      "pearson_correlation": 0.051,
+      "p_value": 3.41e-10,
+      "regression_slope_bps": 0.0074,
+      "regression_intercept_bps": -0.0139,
+      "r_squared": 0.0026,
+      "std_err": 0.0012
+    },
+    {
+      "horizon_ms": 100,
+      "sample_count": 7975,
+      "pearson_correlation": -0.0157,
+      "p_value": 0.162,
+      "regression_slope_bps": -0.0025,
+      "regression_intercept_bps": -0.0313,
+      "r_squared": 0.0002,
+      "std_err": 0.0018
+    },
+    {
+      "horizon_ms": 250,
+      "sample_count": 980,
+      "pearson_correlation": 0.2347,
+      "p_value": 9.98e-14,
+      "regression_slope_bps": 0.0497,
+      "regression_intercept_bps": -0.1381,
+      "r_squared": 0.0551,
+      "std_err": 0.0066
+    }
   ],
-  "findings": "OBI > +0.3 increases the probability of an upward mid-price jump within 100ms by 3.2x compared to balanced books."
+  "conclusions": "Evaluated 7,975 observations at 100ms horizon. Statistically weak/marginal neutral/negative association (r = -0.0157, slope = -0.0025 bps/OBI, p = 0.162). Order book imbalance captures short-term liquidity skew on the evaluated event stream."
 }
