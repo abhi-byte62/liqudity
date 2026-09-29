@@ -1,13 +1,34 @@
 import React, { useState } from 'react';
-import { ListOrdered, Play, XCircle, RotateCcw, ArrowRight } from 'lucide-react';
+import { ListOrdered, Play, XCircle, RotateCcw } from 'lucide-react';
+
+function computeQueueRows(ordersList) {
+  const result = [];
+  let cum = 0;
+  for (let idx = 0; idx < ordersList.length; idx++) {
+    const ord = ordersList[idx];
+    const ahead = cum;
+    cum += ord.size;
+    result.push({
+      pos: idx + 1,
+      id: ord.id,
+      name: ord.name,
+      side: ord.side,
+      size: ord.size,
+      cum,
+      ahead,
+      status: ord.status
+    });
+  }
+  return result;
+}
 
 export default function QueueTrackerView() {
   const initialOrders = [
-    { id: '101', name: 'Order A (Mkt)', size: 50, status: 'ahead' },
-    { id: '102', name: 'Order B (Mkt)', size: 30, status: 'ahead' },
-    { id: '999', name: 'YOU (Limit Bid)', size: 20, status: 'you' },
-    { id: '103', name: 'Order C (Mkt)', size: 40, status: 'behind' },
-    { id: '104', name: 'Order D (Mkt)', size: 60, status: 'behind' }
+    { id: '101', name: 'Order A (Mkt)', side: 'BUY', size: 50, status: 'ahead' },
+    { id: '102', name: 'Order B (Mkt)', side: 'BUY', size: 30, status: 'ahead' },
+    { id: '999', name: 'YOU (Limit Bid)', side: 'BUY', size: 20, status: 'you' },
+    { id: '103', name: 'Order C (Mkt)', side: 'BUY', size: 40, status: 'behind' },
+    { id: '104', name: 'Order D (Mkt)', side: 'BUY', size: 60, status: 'behind' }
   ];
 
   const [orders, setOrders] = useState(initialOrders);
@@ -39,13 +60,12 @@ export default function QueueTrackerView() {
         if (ord.size <= remainingTrade) {
           remainingTrade -= ord.size;
           newLog.unshift(`TRADE EXEC: Market Sell matched Order ${ord.name} for ${ord.size} units (Filled & dequeued).`);
-          return { ...ord, size: 0 };
-        } else {
-          ord.size -= remainingTrade;
-          newLog.unshift(`TRADE EXEC: Market Sell matched Order ${ord.name} for ${tradeAmount} units (${ord.size} units left ahead).`);
-          remainingTrade = 0;
-          return ord;
+          return { ...ord, size: 0, status: 'filled' };
         }
+        ord.size -= remainingTrade;
+        newLog.unshift(`TRADE EXEC: Market Sell matched Order ${ord.name} for ${tradeAmount} units (${ord.size} units left ahead).`);
+        remainingTrade = 0;
+        return ord;
       } else if (ord.status === 'you') {
         const fillAmt = Math.min(ord.size, remainingTrade);
         newYourFilled += fillAmt;
@@ -55,25 +75,26 @@ export default function QueueTrackerView() {
         return ord;
       }
       return ord;
-    }).filter(ord => ord.size > 0 || ord.id === '999');
+    });
 
     setOrders(updated);
     setYourFilled(newYourFilled);
     setHistoryLog(newLog.slice(0, 10));
   };
 
-  const handleSimulateCancel = (targetId = '102') => {
-    const aheadOrders = orders.filter(o => o.status === 'ahead');
+  const handleSimulateCancel = () => {
+    const aheadOrders = orders.filter(o => o.status === 'ahead' && o.size > 0);
     if (aheadOrders.length === 0) return;
 
     const target = aheadOrders[0];
     const cancelSize = Math.min(target.size, 20);
     const updated = orders.map(ord => {
       if (ord.id === target.id) {
-        return { ...ord, size: ord.size - cancelSize };
+        const rem = ord.size - cancelSize;
+        return { ...ord, size: rem, status: rem === 0 ? 'cancelled' : 'ahead' };
       }
       return ord;
-    }).filter(ord => ord.size > 0);
+    });
 
     setOrders(updated);
     setHistoryLog([
@@ -87,6 +108,8 @@ export default function QueueTrackerView() {
     setYourFilled(0);
     setHistoryLog(["Re-initialized deterministic FIFO queue simulator."]);
   };
+
+  const tableRows = computeQueueRows(orders);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -110,7 +133,7 @@ export default function QueueTrackerView() {
             <button onClick={() => handleSimulateTrade(40)} className="btn-terminal primary">
               <Play size={12} /> TRADE (40 QTY)
             </button>
-            <button onClick={() => handleSimulateCancel('102')} className="btn-terminal">
+            <button onClick={handleSimulateCancel} className="btn-terminal">
               <XCircle size={12} /> CANCEL AHEAD (20 QTY)
             </button>
             <button onClick={handleReset} className="btn-terminal" title="Reset State">
@@ -153,56 +176,79 @@ export default function QueueTrackerView() {
         </div>
       </div>
 
-      {/* Visual Queue Lane */}
+      {/* Technical Tabular Queue Layout */}
       <div className="terminal-panel">
         <div className="terminal-header">
           <span className="panel-title">
-            FIFO EXECUTION PRIORITY SEQUENCE (LEFT = HEAD OF QUEUE)
+            FIFO EXECUTION PRIORITY SEQUENCE (TOP = HEAD OF QUEUE)
           </span>
           <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-            FIRST IN, FIRST OUT
+            DETERMINISTIC MEMORY LADDER
           </span>
         </div>
 
-        <div style={{ padding: '16px', display: 'flex', gap: '8px', overflowX: 'auto' }}>
-          {orders.map((ord, idx) => {
-            const isYou = ord.id === '999';
-            return (
-              <div
-                key={ord.id}
-                style={{
-                  minWidth: '150px',
-                  padding: '10px',
-                  background: isYou ? 'rgba(63, 185, 80, 0.08)' : 'var(--bg-surface)',
-                  border: isYou ? '1px solid var(--color-green)' : '1px solid var(--border-subtle)',
-                  borderRadius: '3px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '11px', fontWeight: '600', color: isYou ? 'var(--color-green)' : 'var(--text-primary)' }}>
-                    {ord.name}
-                  </span>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                    #{idx + 1}
-                  </span>
-                </div>
-
-                <div className="font-mono" style={{ fontSize: '16px', fontWeight: '700', color: isYou ? 'var(--color-green)' : 'var(--text-primary)' }}>
-                  {ord.size} <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>units</span>
-                </div>
-
-                <div style={{ marginTop: '2px' }}>
-                  <span className={`status-pill ${isYou ? 'real' : ord.status === 'ahead' ? 'neutral' : 'warning'}`}>
-                    {isYou ? 'YOUR LIMIT BID' : ord.status === 'ahead' ? 'AHEAD OF YOU' : 'BEHIND YOU'}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <table className="terminal-table">
+          <thead>
+            <tr>
+              <th>POS</th>
+              <th>ORDER ID</th>
+              <th>IDENTIFIER</th>
+              <th>SIDE</th>
+              <th>SIZE</th>
+              <th>CUMULATIVE</th>
+              <th>VOL AHEAD</th>
+              <th>STATUS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tableRows.map((row) => {
+              const isYou = row.id === '999';
+              const isDepleted = row.size === 0;
+              return (
+                <tr
+                  key={row.id}
+                  style={{
+                    background: isYou ? 'rgba(63, 185, 80, 0.05)' : isDepleted ? 'rgba(255, 255, 255, 0.01)' : 'transparent',
+                    opacity: isDepleted ? 0.6 : 1.0
+                  }}
+                >
+                  <td className="font-mono" style={{ fontWeight: '600', color: isYou ? 'var(--color-green)' : 'var(--text-muted)' }}>
+                    {String(row.pos).padStart(2, '0')}
+                  </td>
+                  <td className="font-mono" style={{ fontWeight: '600', color: isYou ? 'var(--color-green)' : 'var(--color-blue)' }}>
+                    {row.id}
+                  </td>
+                  <td style={{ color: isYou ? 'var(--color-green)' : 'var(--text-primary)', fontWeight: isYou ? '600' : '400' }}>
+                    {row.name}
+                  </td>
+                  <td>
+                    <span className="status-pill real">{row.side}</span>
+                  </td>
+                  <td className="font-mono" style={{ fontWeight: '700', color: isYou ? 'var(--color-green)' : 'var(--text-primary)' }}>
+                    {row.size} <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '400' }}>units</span>
+                  </td>
+                  <td className="font-mono" style={{ color: 'var(--text-muted)' }}>
+                    {row.cum} units
+                  </td>
+                  <td className="font-mono" style={{ color: row.ahead === 0 ? 'var(--color-green)' : 'var(--text-secondary)' }}>
+                    {row.ahead} units
+                  </td>
+                  <td>
+                    {isDepleted ? (
+                      <span className="status-pill neutral">FILLED & DEQUEUED</span>
+                    ) : isYou ? (
+                      <span className="status-pill real">YOUR ACTIVE QUOTE</span>
+                    ) : row.status === 'ahead' ? (
+                      <span className="status-pill warning">AHEAD OF YOU</span>
+                    ) : (
+                      <span className="status-pill neutral">BEHIND YOU</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
       {/* Activity Log */}
