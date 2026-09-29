@@ -6,7 +6,7 @@
   "metrics": {
     "mean_inter_arrival_ms": {
       "synthetic": 0.17,
-      "real": 26.15
+      "real": 115.55
     },
     "median_inter_arrival_ms": {
       "synthetic": 0.09,
@@ -14,7 +14,7 @@
     },
     "trade_size_mean": {
       "synthetic": 28.96,
-      "real": 1.35
+      "real": 1.28
     }
   },
   "conclusions": [
