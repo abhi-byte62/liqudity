@@ -1,0 +1,43 @@
+{
+  "experiment_id": "EXP-005",
+  "title": "Spread vs Expected P&L",
+  "hypothesis": "Capturing spread is only profitable when gross spread captured exceeds post-fill adverse selection loss.",
+  "data": [
+    {
+      "spread_bps": 0.5,
+      "spread_captured_bps": 0.5,
+      "adverse_selection_bps": 0.23,
+      "net_pnl_bps": 0.03
+    },
+    {
+      "spread_bps": 1.0,
+      "spread_captured_bps": 1.0,
+      "adverse_selection_bps": 0.45,
+      "net_pnl_bps": 0.3
+    },
+    {
+      "spread_bps": 2.0,
+      "spread_captured_bps": 2.0,
+      "adverse_selection_bps": 0.9,
+      "net_pnl_bps": 0.85
+    },
+    {
+      "spread_bps": 3.0,
+      "spread_captured_bps": 3.0,
+      "adverse_selection_bps": 1.35,
+      "net_pnl_bps": 1.4
+    },
+    {
+      "spread_bps": 5.0,
+      "spread_captured_bps": 5.0,
+      "adverse_selection_bps": 2.25,
+      "net_pnl_bps": 2.5
+    },
+    {
+      "spread_bps": 8.0,
+      "spread_captured_bps": 8.0,
+      "adverse_selection_bps": 3.6,
+      "net_pnl_bps": 4.15
+    }
+  ]
+}
