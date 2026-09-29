@@ -234,6 +234,21 @@ def run_simulation(req: SimulationRequest):
     result["dataset_type"] = "REAL" if "real" in req.dataset else "SYNTHETIC"
     return result
 
+@app.get("/api/experiments/all")
+def get_all_experiments():
+    exp_dir = "research/experiments"
+    results = {}
+    if os.path.exists(exp_dir):
+        for f in os.listdir(exp_dir):
+            if f.endswith(".json") and not f.startswith("temp_"):
+                key = f.replace(".json", "")
+                try:
+                    with open(os.path.join(exp_dir, f), "r") as fp:
+                        results[key] = json.load(fp)
+                except Exception:
+                    pass
+    return {"experiments": results}
+
 @app.get("/api/experiments/latency")
 def get_latency_experiments(strategy: str = "avellaneda", dataset: str = "btc_liquid_balanced"):
     csv_file = f"data/processed/{dataset}.csv"
