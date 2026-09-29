@@ -77,14 +77,9 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < num_events; ++i) {
         current_ts += 500; // 500 ns interval (~2M events/sec arrival)
         int r = type_dist(rng);
-        
-        // Slight drift
-        if (i % 200 == 0) {
-            current_mid += (rng() % 3 == 0) ? 1 : ((rng() % 3 == 1) ? -1 : 0);
-        }
 
         if (r <= 60) {
-            // 60% Add limit orders (strictly uncrossed)
+            // 60% Add limit orders (strictly uncrossed: bids <= current_mid - 1, asks >= current_mid + 1)
             bool is_buy = (rng() % 2 == 0);
             Side side = is_buy ? Side::BUY : Side::SELL;
             Price price = is_buy ? (current_mid - level_dist(rng)) : (current_mid + level_dist(rng));
@@ -97,7 +92,7 @@ int main(int argc, char* argv[]) {
             Price price = (side == Side::BUY) ? (current_mid - 1) : (current_mid + 1);
             test_events.emplace_back(current_ts, EventType::CANCEL, side, price, qty_dist(rng), cancel_id);
         } else {
-            // 15% Trade (hits touch)
+            // 15% Trade (aggressive market trade hitting the touch)
             bool is_buy_aggr = (rng() % 2 == 0);
             Side side = is_buy_aggr ? Side::BUY : Side::SELL;
             Price price = is_buy_aggr ? (current_mid + 1) : (current_mid - 1);
