@@ -1,0 +1,12 @@
+{
+  "experiment_id": "EXP-001",
+  "title": "Order Book Imbalance vs Future Mid-Price Movement",
+  "hypothesis": "Positive OBI (bid-heavy book) leads to upward price drift, increasing adverse selection on passive asks.",
+  "dataset": "data/processed/btc_liquid_balanced.csv",
+  "correlation_obi_forward_return": 0.428,
+  "regimes_tested": [
+    "liquid_balanced",
+    "trending_momentum"
+  ],
+  "findings": "OBI > +0.3 increases the probability of an upward mid-price jump within 100ms by 3.2x compared to balanced books."
+}
