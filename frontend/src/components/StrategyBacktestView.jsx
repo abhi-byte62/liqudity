@@ -14,7 +14,7 @@ export default function StrategyBacktestView({ onRunBacktest, currentResult, isR
       strategy,
       latency,
       gamma: parseFloat(gamma),
-      max_inventory: parseInt(maxInventory),
+      max_inventory: parseInt(maxInventory, 10),
       maker_fee_bps: parseFloat(makerFee)
     });
   };
@@ -31,8 +31,64 @@ export default function StrategyBacktestView({ onRunBacktest, currentResult, isR
     max_inventory_exposure: 80,
     spread_captured_bps: 1.70,
     adverse_selection_bps: 1.10,
-    net_pnl_bps: 0.55
+    net_pnl_bps: 0.55,
+    pnl_series: []
   };
+
+  // Extract raw P&L values from the actual backend response
+  const rawPnlPoints = res.pnl_series || [];
+  const pnlValues = rawPnlPoints.map(pt => (pt.pnl !== undefined ? pt.pnl : (typeof pt === 'number' ? pt : 0)));
+
+  // SVG Chart Dimensions & Dynamic Scaling
+  const width = 500;
+  const height = 120;
+  const padTop = 12;
+  const padBottom = 16;
+  const padLeft = 45;
+  const padRight = 15;
+  const plotWidth = width - padLeft - padRight;
+  const plotHeight = height - padTop - padBottom;
+
+  let pointsString = '';
+  let minPnl = 0;
+  let maxPnl = 0;
+  let zeroY = null;
+  const hasData = pnlValues.length > 0;
+
+  if (hasData) {
+    minPnl = Math.min(...pnlValues);
+    maxPnl = Math.max(...pnlValues);
+
+    // If all points are identical, create a symmetric margin
+    let range = maxPnl - minPnl;
+    if (range === 0) {
+      range = Math.abs(maxPnl) > 0 ? Math.abs(maxPnl) * 0.1 : 1.0;
+      minPnl -= range / 2;
+      maxPnl += range / 2;
+    } else {
+      // 5% margin padding
+      const margin = range * 0.05;
+      minPnl -= margin;
+      maxPnl += margin;
+      range = maxPnl - minPnl;
+    }
+
+    const n = pnlValues.length;
+    pointsString = pnlValues.map((val, i) => {
+      const x = padLeft + (n > 1 ? (i / (n - 1)) * plotWidth : plotWidth / 2);
+      const normalizedY = (val - minPnl) / range;
+      const y = height - padBottom - (normalizedY * plotHeight);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+
+    if (minPnl < 0 && maxPnl > 0) {
+      const zeroNorm = (0 - minPnl) / range;
+      zeroY = height - padBottom - (zeroNorm * plotHeight);
+    }
+  }
+
+  const finalPnl = hasData ? pnlValues[pnlValues.length - 1] : (res.total_pnl_usd ?? 0);
+  const isPositive = finalPnl >= 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -178,36 +234,58 @@ export default function StrategyBacktestView({ onRunBacktest, currentResult, isR
         </div>
       </div>
 
-      {/* P&L Trajectory Polyline */}
+      {/* Dynamic P&L Trajectory Chart */}
       <div className="terminal-panel">
         <div className="terminal-header">
           <span className="panel-title">
             SIMULATED CUMULATIVE P&L TRAJECTORY & INVENTORY RUN
           </span>
           <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-            DISCRETE TIME STEP RESAMPLING
+            {hasData ? `${pnlValues.length.toLocaleString()} DISCRETE SAMPLES` : 'NO ACTIVE TRAJECTORY'}
           </span>
         </div>
 
         <div style={{ padding: '16px' }}>
-          <div style={{ height: '140px', width: '100%', position: 'relative', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: '2px', display: 'flex', alignItems: 'center' }}>
-            <svg style={{ width: '100%', height: '100%' }} viewBox="0 0 500 120" preserveAspectRatio="none">
-              {/* Hairline Grid lines */}
-              <line x1="0" y1="30" x2="500" y2="30" stroke="var(--border-subtle)" strokeDasharray="3 3" />
-              <line x1="0" y1="60" x2="500" y2="60" stroke="var(--border-subtle)" strokeDasharray="3 3" />
-              <line x1="0" y1="90" x2="500" y2="90" stroke="var(--border-subtle)" strokeDasharray="3 3" />
+          <div style={{ height: '140px', width: '100%', position: 'relative', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {hasData ? (
+              <svg style={{ width: '100%', height: '100%' }} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+                {/* Horizontal Grid lines */}
+                <line x1={padLeft} y1={padTop} x2={width - padRight} y2={padTop} stroke="var(--border-subtle)" strokeDasharray="3 3" />
+                <line x1={padLeft} y1={height / 2} x2={width - padRight} y2={height / 2} stroke="var(--border-subtle)" strokeDasharray="3 3" />
+                <line x1={padLeft} y1={height - padBottom} x2={width - padRight} y2={height - padBottom} stroke="var(--border-subtle)" strokeDasharray="3 3" />
 
-              {/* Trajectory Polyline */}
-              <polyline
-                fill="none"
-                stroke="var(--color-green)"
-                strokeWidth="1.5"
-                points="0,110 50,95 100,85 150,70 200,60 250,55 300,45 350,35 400,28 450,22 500,15"
-              />
-            </svg>
-            <div style={{ position: 'absolute', bottom: '6px', right: '10px', fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-              Net Return: +${(res.total_pnl_usd ?? 0).toFixed(2)} USD
-            </div>
+                {/* Zero baseline if in range */}
+                {zeroY !== null && (
+                  <line x1={padLeft} y1={zeroY} x2={width - padRight} y2={zeroY} stroke="var(--border-strong)" strokeDasharray="2 2" />
+                )}
+
+                {/* Left Y-Axis Labels */}
+                <text x={padLeft - 5} y={padTop + 8} fill="var(--text-muted)" fontSize="9" fontFamily="var(--font-mono)" textAnchor="end">
+                  ${maxPnl.toFixed(0)}
+                </text>
+                <text x={padLeft - 5} y={height - padBottom} fill="var(--text-muted)" fontSize="9" fontFamily="var(--font-mono)" textAnchor="end">
+                  ${minPnl.toFixed(0)}
+                </text>
+
+                {/* Actual P&L Trajectory Polyline */}
+                <polyline
+                  fill="none"
+                  stroke={isPositive ? 'var(--color-green)' : 'var(--color-red)'}
+                  strokeWidth="1.5"
+                  points={pointsString}
+                />
+              </svg>
+            ) : (
+              <div style={{ color: 'var(--text-muted)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                [NO SIMULATION TRAJECTORY RECORDED — EXECUTE SIMULATION TO GENERATE P&L RUN]
+              </div>
+            )}
+
+            {hasData && (
+              <div style={{ position: 'absolute', bottom: '6px', right: '10px', fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                Final P&L: <span style={{ color: isPositive ? 'var(--color-green)' : 'var(--color-red)', fontWeight: '600' }}>{finalPnl >= 0 ? `+$${finalPnl.toFixed(2)}` : `-$${Math.abs(finalPnl).toFixed(2)}`} USD</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
