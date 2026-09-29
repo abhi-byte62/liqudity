@@ -1,0 +1,41 @@
+[
+  {
+    "strategy": "Symmetric Adaptive MM",
+    "strategy_key": "symmetric",
+    "fill_rate_percent": 119.28,
+    "total_fills": 1163,
+    "spread_captured_bps": 0.038,
+    "adverse_selection_bps": 0.032,
+    "net_pnl_bps": -1.595,
+    "total_pnl_usd": 14036.5,
+    "sharpe_ratio": 1485.26,
+    "max_drawdown_usd": 54.5,
+    "max_inventory_exposure": 180
+  },
+  {
+    "strategy": "Avellaneda-Stoikov Inventory MM",
+    "strategy_key": "avellaneda",
+    "fill_rate_percent": 119.31,
+    "total_fills": 1149,
+    "spread_captured_bps": 0.038,
+    "adverse_selection_bps": 0.032,
+    "net_pnl_bps": -1.594,
+    "total_pnl_usd": 13882.3,
+    "sharpe_ratio": 1496.73,
+    "max_drawdown_usd": 31.5,
+    "max_inventory_exposure": 180
+  },
+  {
+    "strategy": "Hawkes OBI-Skewed MM",
+    "strategy_key": "hawkes",
+    "fill_rate_percent": 116.3,
+    "total_fills": 2048,
+    "spread_captured_bps": 0.039,
+    "adverse_selection_bps": 0.031,
+    "net_pnl_bps": -4.092,
+    "total_pnl_usd": 25629.1,
+    "sharpe_ratio": 1470.56,
+    "max_drawdown_usd": 59.95,
+    "max_inventory_exposure": 430
+  }
+]
