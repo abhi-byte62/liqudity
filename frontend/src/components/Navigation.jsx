@@ -1,27 +1,34 @@
 import React from 'react';
 import { 
-  BarChart2, 
   Layers, 
-  Target, 
+  ListOrdered, 
+  TrendingDown, 
   Zap, 
-  TrendingUp, 
-  GitCompare, 
+  Activity, 
+  FlaskConical, 
   Cpu 
 } from 'lucide-react';
 
 export default function Navigation({ activeTab, onTabChange }) {
   const tabs = [
-    { id: 'orderbook', label: 'Order Book & Depth', icon: Layers, badge: 'LOB' },
-    { id: 'queue', label: 'Queue Position Dynamics', icon: BarChart2, badge: 'FIFO' },
-    { id: 'adverse', label: 'Adverse Selection & Markouts', icon: Target, badge: 'E[PnL]' },
-    { id: 'latency', label: 'Latency Sensitivity Matrix', icon: Zap, badge: 'Quant Dev' },
-    { id: 'strategy', label: 'Strategy & Backtest Lab', icon: TrendingUp, badge: 'Sim' },
-    { id: 'comparison', label: 'Research Comparison', icon: GitCompare, badge: 'A/B Test' },
-    { id: 'benchmark', label: 'C++ Engine Benchmarks', icon: Cpu, badge: '3.2M eps' }
+    { id: 'orderbook', num: '01', label: 'Order Book', icon: Layers },
+    { id: 'queue', num: '02', label: 'Queue Position Dynamics', icon: ListOrdered },
+    { id: 'adverse', num: '03', label: 'Adverse Selection Markouts', icon: TrendingDown },
+    { id: 'latency', num: '04', label: 'Latency Sensitivity Matrix', icon: Zap },
+    { id: 'strategy', num: '05', label: 'Strategy Backtest Engine', icon: Activity },
+    { id: 'comparison', num: '06', label: 'Research Experiments Lab', icon: FlaskConical },
+    { id: 'benchmark', num: '07', label: 'C++ Engine Benchmarks', icon: Cpu }
   ];
 
   return (
-    <nav style={{ margin: '0 20px 16px 20px', display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+    <nav style={{
+      background: 'var(--bg-app)',
+      borderBottom: '1px solid var(--border-subtle)',
+      padding: '0 16px',
+      display: 'flex',
+      gap: '2px',
+      overflowX: 'auto'
+    }}>
       {tabs.map(tab => {
         const Icon = tab.icon;
         const isActive = activeTab === tab.id;
@@ -32,34 +39,33 @@ export default function Navigation({ activeTab, onTabChange }) {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              padding: '10px 16px',
-              borderRadius: '10px',
-              background: isActive 
-                ? 'linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(56, 189, 248, 0.05))' 
-                : 'rgba(15, 23, 42, 0.6)',
-              border: isActive ? '1px solid var(--accent-cyan)' : '1px solid var(--border-color)',
-              color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
-              fontSize: '13px',
-              fontWeight: isActive ? '700' : '500',
+              gap: '6px',
+              padding: '8px 12px',
+              background: isActive ? 'var(--bg-panel)' : 'transparent',
+              borderTop: '2px solid',
+              borderTopColor: isActive ? 'var(--color-blue)' : 'transparent',
+              borderBottom: '1px solid',
+              borderBottomColor: isActive ? 'var(--bg-panel)' : 'transparent',
+              borderLeft: isActive ? '1px solid var(--border-subtle)' : '1px solid transparent',
+              borderRight: isActive ? '1px solid var(--border-subtle)' : '1px solid transparent',
+              color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontSize: '12px',
+              fontWeight: isActive ? '600' : '400',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
-              transition: 'all 0.2s ease',
-              boxShadow: isActive ? '0 0 16px rgba(0, 240, 255, 0.2)' : 'none'
+              marginBottom: '-1px',
+              transition: 'color 0.15s'
             }}
           >
-            <Icon size={16} color={isActive ? 'var(--accent-cyan)' : 'var(--text-muted)'} />
-            <span>{tab.label}</span>
-            <span style={{
-              fontSize: '10px',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              background: isActive ? 'rgba(0, 240, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-              color: isActive ? '#fff' : 'var(--text-muted)',
-              fontWeight: '600'
+            <span style={{ 
+              fontFamily: 'var(--font-mono)', 
+              fontSize: '10px', 
+              color: isActive ? 'var(--color-blue)' : 'var(--text-muted)' 
             }}>
-              {tab.badge}
+              [{tab.num}]
             </span>
+            <Icon size={13} color={isActive ? 'var(--color-blue)' : 'var(--text-muted)'} />
+            <span>{tab.label}</span>
           </button>
         );
       })}
