@@ -6,6 +6,6 @@
   "timestamp_resolution": "1 millisecond (converted to ns)",
   "total_events": 1100,
   "tick_size": 0.01,
-  "start_time_utc": "2026-09-29T17:50:58Z",
+  "start_time_utc": "2026-09-29T18:45:33Z",
   "limitations": "Binance public spot API provides L2 aggregated depth rather than individual anonymous L3 order IDs. Orders ahead are reconstructed from top-of-book volume queue."
 }
