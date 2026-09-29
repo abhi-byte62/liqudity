@@ -303,6 +303,129 @@ void test_avellaneda_stoikov_and_pnl_invariants() {
     std::cout << "PASSED\n";
 }
 
+// Test 9: Detailed Queue Tracker Edge Cases (Cancellations Ahead/Behind, Multi-Level, Position Reaching Head)
+void test_queue_tracker_comprehensive_edge_cases() {
+    std::cout << "[Test 9] Queue Tracker Edge Cases & Exact Attribution Boundaries... ";
+    QueueTracker tracker;
+    double tick_size = 0.01;
+    Price price = double_to_ticks(100.0, tick_size);
+
+    // Scenario:
+    // Order 1 (ahead, qty 40)
+    // Order 2 (ahead, qty 60)
+    // Order 99 (OUR ORDER, qty 50)
+    // Order 3 (behind, qty 100)
+    // Order 4 (behind, qty 150)
+    // Total level volume = 400, queue ahead = 100
+    std::vector<OrderId> ahead_ids = {1, 2};
+    tracker.register_order(99, Side::BUY, price, 50, 100, 400, ahead_ids, 1000, 1000, tick_size);
+
+    const auto* ord = tracker.get_order(99);
+    assert(ord != nullptr);
+    assert(ord->current_queue_ahead == 100);
+    assert(ord->remaining_quantity == 50);
+
+    // Edge Case 1: Order 3 (behind) cancels 100
+    tracker.on_order_cancelled(3, price, Side::BUY, 100);
+    assert(ord->current_queue_ahead == 100); // Ahead untouched!
+    assert(ord->behind_volume_cancelled == 100);
+
+    // Edge Case 2: Order 4 (behind) cancels 150
+    tracker.on_order_cancelled(4, price, Side::BUY, 150);
+    assert(ord->current_queue_ahead == 100); // Ahead untouched!
+    assert(ord->behind_volume_cancelled == 250);
+
+    // Edge Case 3: Unknown / non-existent order cancels 50 (fallback conservative attribution)
+    tracker.on_order_cancelled(99999, price, Side::BUY, 50);
+    assert(ord->current_queue_ahead == 100); // Ahead untouched!
+    assert(ord->behind_volume_cancelled == 300);
+
+    // Edge Case 4: Order 1 (ahead) cancels full 40
+    tracker.on_order_cancelled(1, price, Side::BUY, 40);
+    assert(ord->current_queue_ahead == 60); // Drops from 100 -> 60
+    assert(ord->ahead_volume_cancelled == 40);
+
+    // Edge Case 5: Duplicate cancellation attempt for Order 1 (already removed from ahead set)
+    tracker.on_order_cancelled(1, price, Side::BUY, 40);
+    assert(ord->current_queue_ahead == 60); // Untouched!
+
+    // Edge Case 6: Trade of 60 consumes remaining ahead volume -> Our order reaches FRONT OF QUEUE
+    auto fills1 = tracker.on_trade_event(Side::SELL, price, 60, 2000, 100.005);
+    assert(fills1.empty());
+    assert(ord->current_queue_ahead == 0); // At head of queue!
+    assert(ord->remaining_quantity == 50);
+    assert(ord->state == QueueState::ACTIVE);
+
+    // Edge Case 7: Trade of 20 against our front order -> PARTIAL FILL
+    auto fills2 = tracker.on_trade_event(Side::SELL, price, 20, 3000, 100.005);
+    assert(fills2.size() == 1);
+    assert(fills2[0].fill_quantity == 20);
+    assert(ord->remaining_quantity == 30);
+    assert(ord->filled_quantity == 20);
+    assert(ord->state == QueueState::PARTIALLY_FILLED);
+
+    // Edge Case 8: Trade of 30 against our remaining -> COMPLETE FILL
+    auto fills3 = tracker.on_trade_event(Side::SELL, price, 30, 4000, 100.005);
+    assert(fills3.size() == 1);
+    assert(fills3[0].fill_quantity == 30);
+    assert(ord->remaining_quantity == 0);
+    assert(ord->filled_quantity == 50);
+    assert(ord->state == QueueState::FILLED);
+
+    std::cout << "PASSED\n";
+}
+
+// Test 10: Order Book Defensive Error Handling and Empty/Crossed Book Edge Cases
+void test_order_book_error_handling_and_edge_cases() {
+    std::cout << "[Test 10] Empty Book, Malformed Orders & Defensive Boundaries... ";
+    double tick_size = 0.01;
+    LimitOrderBook book("BTC-USDT", tick_size);
+
+    // 1. Querying an empty book should be safe and return standard zero/defaults
+    assert(!book.has_bid());
+    assert(!book.has_ask());
+    assert(book.get_best_bid() == 0);
+    assert(book.get_best_ask() == 0);
+    assert(book.get_best_bid_qty() == 0);
+    assert(book.get_best_ask_qty() == 0);
+    assert(book.get_spread_ticks() == 0);
+    assert(book.get_mid_price_decimal() == 0.0);
+    assert(book.get_micro_price_decimal() == 0.0);
+    assert(book.get_top_obi() == 0.0);
+    assert(book.validate_invariants()); // Empty book is valid
+
+    // 2. Reject zero or negative quantities / prices
+    Price p100 = double_to_ticks(100.0, tick_size);
+    assert(!book.add_order(1, Side::BUY, p100, 0, 1000)); // Zero qty rejected
+    assert(!book.add_order(2, Side::BUY, -10, 50, 1000)); // Negative price rejected
+    assert(!book.add_order(3, Side::UNKNOWN, p100, 50, 1000)); // Unknown side rejected
+
+    // 3. Cancelling non-existent order returns false
+    assert(!book.cancel_order(99999));
+    assert(!book.modify_order(99999, 100));
+
+    // 4. Populate book
+    book.add_order(10, Side::BUY, p100, 50, 1000);
+    Price p101 = double_to_ticks(101.0, tick_size);
+    book.add_order(20, Side::SELL, p101, 50, 1000);
+    assert(book.validate_invariants());
+    assert(book.get_total_active_orders() == 2);
+
+    // 5. Modify order quantity to 0 should cancel the order safely
+    bool mod_zero = book.modify_order(10, 0);
+    assert(mod_zero);
+    assert(!book.has_bid());
+    assert(book.get_total_active_orders() == 1);
+
+    // 6. Trade exceeding available depth should safely consume level and leave book empty on that side
+    book.process_trade(Side::BUY, p101, 100); // Buy trade of 100 against ask of 50
+    assert(!book.has_ask());
+    assert(book.get_total_active_orders() == 0);
+    assert(book.validate_invariants());
+
+    std::cout << "PASSED\n";
+}
+
 int main() {
     std::cout << "\n========================================================\n";
     std::cout << "    Running Comprehensive LiquidityLens Engine Tests    \n";
@@ -316,9 +439,12 @@ int main() {
     test_adverse_selection_buy_and_sell_markouts();
     test_latency_delayed_activation();
     test_avellaneda_stoikov_and_pnl_invariants();
+    test_queue_tracker_comprehensive_edge_cases();
+    test_order_book_error_handling_and_edge_cases();
 
     std::cout << "========================================================\n";
-    std::cout << "   ALL 8 COMPREHENSIVE ENGINE TESTS PASSED CLEANLY!     \n";
+    std::cout << "   ALL 10 COMPREHENSIVE ENGINE TESTS PASSED CLEANLY!    \n";
     std::cout << "========================================================\n\n";
     return 0;
 }
+
