@@ -1,42 +1,124 @@
 {
   "experiment_id": "EXP-002",
-  "title": "Queue Position vs Fill Probability",
-  "hypothesis": "Higher queue-ahead volume exponentially decreases the probability of execution before a market price reversal.",
+  "title": "Queue Position Dynamics vs Limit Order Fill Probability",
+  "method": "controlled_fifo_simulation",
+  "dataset": "data/processed/btc_liquid_balanced.csv",
+  "seed": 42,
+  "total_trials": 17500,
+  "trials_per_level": 2500,
   "curve": [
     {
       "queue_ahead_units": 0,
-      "fill_probability": 1.0,
-      "avg_fill_time_ms": 0.5
+      "trials": 2500,
+      "fills": 1612,
+      "fill_probability": 0.6448,
+      "confidence_interval_95": [
+        0.626,
+        0.6636
+      ],
+      "partial_fills": 12,
+      "partial_fill_probability": 0.0048,
+      "mean_time_to_fill_ms": 1.53,
+      "p50_time_to_fill_ms": 0.08,
+      "p90_time_to_fill_ms": 3.37,
+      "p99_time_to_fill_ms": 23.4
     },
     {
       "queue_ahead_units": 25,
-      "fill_probability": 0.922,
-      "avg_fill_time_ms": 3.5
+      "trials": 2500,
+      "fills": 1557,
+      "fill_probability": 0.6228,
+      "confidence_interval_95": [
+        0.6038,
+        0.6418
+      ],
+      "partial_fills": 21,
+      "partial_fill_probability": 0.0084,
+      "mean_time_to_fill_ms": 2.03,
+      "p50_time_to_fill_ms": 0.16,
+      "p90_time_to_fill_ms": 4.27,
+      "p99_time_to_fill_ms": 37.15
     },
     {
       "queue_ahead_units": 50,
-      "fill_probability": 0.844,
-      "avg_fill_time_ms": 6.5
+      "trials": 2500,
+      "fills": 1469,
+      "fill_probability": 0.5876,
+      "confidence_interval_95": [
+        0.5683,
+        0.6069
+      ],
+      "partial_fills": 18,
+      "partial_fill_probability": 0.0072,
+      "mean_time_to_fill_ms": 1.96,
+      "p50_time_to_fill_ms": 0.26,
+      "p90_time_to_fill_ms": 4.64,
+      "p99_time_to_fill_ms": 32.76
     },
     {
       "queue_ahead_units": 100,
-      "fill_probability": 0.688,
-      "avg_fill_time_ms": 12.5
+      "trials": 2500,
+      "fills": 1395,
+      "fill_probability": 0.558,
+      "confidence_interval_95": [
+        0.5385,
+        0.5775
+      ],
+      "partial_fills": 10,
+      "partial_fill_probability": 0.004,
+      "mean_time_to_fill_ms": 2.97,
+      "p50_time_to_fill_ms": 0.44,
+      "p90_time_to_fill_ms": 5.55,
+      "p99_time_to_fill_ms": 43.02
     },
     {
       "queue_ahead_units": 150,
-      "fill_probability": 0.531,
-      "avg_fill_time_ms": 18.5
+      "trials": 2500,
+      "fills": 1326,
+      "fill_probability": 0.5304,
+      "confidence_interval_95": [
+        0.5108,
+        0.55
+      ],
+      "partial_fills": 8,
+      "partial_fill_probability": 0.0032,
+      "mean_time_to_fill_ms": 3.21,
+      "p50_time_to_fill_ms": 0.65,
+      "p90_time_to_fill_ms": 6.47,
+      "p99_time_to_fill_ms": 47.45
     },
     {
       "queue_ahead_units": 200,
-      "fill_probability": 0.375,
-      "avg_fill_time_ms": 24.5
+      "trials": 2500,
+      "fills": 1320,
+      "fill_probability": 0.528,
+      "confidence_interval_95": [
+        0.5084,
+        0.5476
+      ],
+      "partial_fills": 3,
+      "partial_fill_probability": 0.0012,
+      "mean_time_to_fill_ms": 3.06,
+      "p50_time_to_fill_ms": 0.74,
+      "p90_time_to_fill_ms": 6.82,
+      "p99_time_to_fill_ms": 33.15
     },
     {
       "queue_ahead_units": 300,
-      "fill_probability": 0.062,
-      "avg_fill_time_ms": 36.5
+      "trials": 2500,
+      "fills": 1285,
+      "fill_probability": 0.514,
+      "confidence_interval_95": [
+        0.4944,
+        0.5336
+      ],
+      "partial_fills": 2,
+      "partial_fill_probability": 0.0008,
+      "mean_time_to_fill_ms": 3.45,
+      "p50_time_to_fill_ms": 0.93,
+      "p90_time_to_fill_ms": 7.39,
+      "p99_time_to_fill_ms": 43.99
     }
-  ]
+  ],
+  "conclusions": "Simulated 17,500 total placements under seed=42. Fill probability strictly decays from 64.5% at queue head to 51.4% at tail (300 units ahead). FIFO queue priority provides decisive execution edge before adverse price moves."
 }
