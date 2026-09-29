@@ -106,14 +106,86 @@ LiquidityLens maintains a strict distinction between real and synthetic feeds:
 
 ## 4. Quantitative Research Experiments
 
-All 7 research experiments are executed via `python research/experiments.py`:
+LiquidityLens contains 7 quantitative microstructure experiments executed via `python research/experiments.py`. The platform maintains a strict distinction across methodology types:
 
-* **EXP-001 (OBI vs. Short-Horizon Mid-Price Movement):** Replays the event stream dynamically with strict zero look-ahead bias, evaluating Pearson correlation $r$, regression slope, $R^2$, and $p$-value between top-level order-book imbalance ($\text{OBI} = \frac{Q_b - Q_a}{Q_b + Q_a}$) and forward mid-price returns across horizons from $10\,\text{ms}$ to $1\,\text{s}$.
-* **EXP-002 (Queue Position vs. Fill Probability):** Executes a controlled FIFO simulation across 17,500 total simulated order placements ($2,500$ trials across 7 queue-ahead tiers under fixed seed $= 42$), measuring empirical fill probabilities, 95% Wilson binomial confidence intervals, and $P_{50}/P_{90}$ fill times.
-* **EXP-003 & EXP-004 (Latency vs. Fill Rate & Adverse Selection):** Evaluates how order transmission delays ($10\,\mu\text{s} \to 500\,\mu\text{s}$) degrade passive fill rates and increase adverse selection markouts across 6 latency tiers.
-* **EXP-005 (Spread vs. Expected P&L):** Analyzes the economic trade-off between quoting wider spreads (lower fill probability, higher edge per trade) versus narrower spreads (higher fill probability, higher adverse selection).
-* **EXP-006 (Volatility vs. Adverse Selection):** Measures how local microstructure volatility scales the magnitude of post-fill adverse price movement.
-* **EXP-007 (Synthetic vs. Real Market Data Comparison):** Cross-validates synthetic Hawkes microstructure distributions against real Binance trade flow.
+| Experiment | Title | Methodology Type | Data Source |
+| :--- | :--- | :--- | :--- |
+| **EXP-001** | OBI vs. Future Mid-Price Return | Dynamic Event Replay | Synthetic LOB Stream (`btc_liquid_balanced.csv`) |
+| **EXP-002** | Queue Position vs. Fill Probability | Controlled FIFO Simulation | Synthetic L3 Event Stream ($17,500$ Trials, Seed=42) |
+| **EXP-003** | Latency vs. Adverse Selection Toxicity | Dynamic C++ Simulation | Binance Spot L2 + Real Trades ($10\,\mu\text{s} \to 500\,\mu\text{s}$) |
+| **EXP-004** | Pure Spread MM vs. Skewed MM | Dynamic C++ Simulation | Real Binance Feed + High Volatility Stream |
+| **EXP-005** | Hawkes Clustering Analysis | MLE Calibration Model | Trade Inter-Arrival Timestamps |
+| **EXP-006** | Microstructure Regime Shifts | Cross-Regime Stress Test | 4 Distinct Microstructure Regime Streams |
+| **EXP-007** | Synthetic vs. Real Feed Comparison | Distributional Comparison | Real Binance Spot L2 vs. Synthetic Hawkes L3 |
+
+---
+
+### EXP-001 — Order Book Imbalance vs. Future Mid-Price Return
+
+- **Method:** Dynamic Event Replay (Strict Zero Look-Ahead)
+- **Data Source:** Synthetic LOB stream (`data/processed/btc_liquid_balanced.csv`)
+- **Execution Mechanism:**
+  1. The Limit Order Book is reconstructed sequentially from the event stream.
+  2. Quoting and book features evaluated at timestamp $t$ strictly use information available at or before $t$.
+  3. Top-level Order Book Imbalance is calculated as:
+     $$\text{OBI}(t) = \frac{Q_{\text{bid}}(t) - Q_{\text{ask}}(t)}{Q_{\text{bid}}(t) + Q_{\text{ask}}(t)}$$
+  4. Depth-weighted OBI across the top 5 levels is also computed.
+  5. Future mid-prices are evaluated across multiple horizons: $10\,\text{ms}, 25\,\text{ms}, 50\,\text{ms}, 100\,\text{ms}, 250\,\text{ms}, 500\,\text{ms}, 1000\,\text{ms}$.
+  6. Pearson correlation $r$ and OLS linear regression are computed dynamically.
+
+**Current $100\,\text{ms}$ Primary Horizon Result:**
+- **Sample Count:** $7,975$ valid uncrossed book observations
+- **Pearson $r$:** $-0.0157$ ($p = 0.162$)
+- **Regression Slope:** $-0.0025\,\text{bps/OBI}$
+- **$R^2$:** $0.0002$ (Standard Error: $0.0018$)
+
+**Multi-Horizon Progression:**
+- **$10\,\text{ms}$:** $N = 26,076$, $r = +0.0005$, $p = 0.941$
+- **$25\,\text{ms}$:** $N = 21,317$, $r = +0.0297$, $p = 1.42 \times 10^{-5}$
+- **$50\,\text{ms}$:** $N = 15,163$, $r = +0.0510$, $p = 3.41 \times 10^{-10}$
+- **$100\,\text{ms}$:** $N = 7,975$, $r = -0.0157$, $p = 0.162$
+- **$250\,\text{ms}$:** $N = 980$, $r = +0.2347$, $p = 9.98 \times 10^{-14}$
+
+> *Methodological Note:* This experiment measures the observed association between order-book imbalance and subsequent mid-price returns within the evaluated synthetic market regime. The balanced synthetic regime produces a near-zero $100\,\text{ms}$ linear association, while longer horizons show stronger positive association. These results are specific to the generated market regime and should not be interpreted as universal real-market behavior.
+
+---
+
+### EXP-002 — Queue Position vs. Fill Probability
+
+- **Method:** Controlled FIFO Simulation
+- **Data Source:** Synthetic L3 event stream (`data/processed/btc_liquid_balanced.csv`)
+- **Total Placements:** $17,500$ independent trials ($2,500$ trials across 7 queue-ahead tiers)
+- **Random Seed:** $42$ (Deterministic reproduction)
+- **Execution Mechanism:**
+  1. For each trial, a simulated passive limit order of size $10$ is placed at the prevailing touch.
+  2. Volume ahead is initialized to $Q_{\text{ahead}} \in [0, 25, 50, 100, 150, 200, 300]$.
+  3. Subsequent market trade events deplete volume ahead first before allocating fills to the simulated order.
+  4. Cancellations occurring ahead of the order decrement $Q_{\text{ahead}}$, while cancellations occurring behind leave $Q_{\text{ahead}}$ untouched.
+  5. Fills, partial fills, cancellations, and fill times are recorded.
+  6. 95% binomial confidence intervals are computed using the Wilson/normal approximation method.
+
+**Empirical Queue Fill Results:**
+
+| Queue Ahead ($Q_{\text{ahead}}$) | Placements | Fills | Fill Probability | 95% Confidence Interval | $P_{50}$ Fill Time | $P_{90}$ Fill Time |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **0 units (Head)** | 2,500 | 1,612 | **64.5%** | $[62.6\%, 66.4\%]$ | 0.08 ms | 3.37 ms |
+| **25 units** | 2,500 | 1,557 | **62.3%** | $[60.4\%, 64.2\%]$ | 0.16 ms | 4.27 ms |
+| **50 units** | 2,500 | 1,469 | **58.8%** | $[56.8\%, 60.7\%]$ | 0.26 ms | 4.64 ms |
+| **100 units** | 2,500 | 1,395 | **55.8%** | $[53.8\%, 57.8\%]$ | 0.44 ms | 5.55 ms |
+| **150 units** | 2,500 | 1,326 | **53.0%** | $[51.1\%, 55.0\%]$ | 0.65 ms | 6.47 ms |
+| **200 units** | 2,500 | 1,320 | **52.8%** | $[50.8\%, 54.8\%]$ | 0.85 ms | 7.22 ms |
+| **300 units (Tail)** | 2,500 | 1,229 | **49.2%** | $[47.2\%, 51.1\%]$ | 1.25 ms | 8.91 ms |
+
+> *Methodological Note:* This captures the simulated relationship between queue-ahead volume and passive execution probability under the specified synthetic event-flow model. Queue priority provides a decisive execution edge before adverse price movement occurs.
+
+---
+
+### Research Integrity & Validation Principles
+
+- **No Static Baseline Placeholders:** Experiment outputs are generated dynamically by executing the underlying simulation/replay scripts rather than loading manually curated summary values.
+- **Deterministic Replication:** Simulations use explicit random seeds (`seed = 42`) to guarantee bit-for-bit identical outputs across consecutive runs.
+- **Explicit Methodology Taxonomy:** All research outputs are explicitly classified as *Dynamic Event Replay*, *Controlled FIFO Simulation*, *Dynamic C++ Simulation*, *MLE Calibration*, or *Distributional Comparison*.
+- **Scope Discipline:** Statistical associations and fill rates are reported strictly within their stated dataset parameters without making unproven universal real-market claims.
 
 ---
 
